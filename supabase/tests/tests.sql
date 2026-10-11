@@ -1,0 +1,321 @@
+-- =====================================================================
+-- SOUKI DEALS — tests automatiques (PostgreSQL local + simulation Supabase)
+-- =====================================================================
+\set ON_ERROR_STOP on
+\set QUIET on
+\o /dev/null
+
+-- ---------- Outils de test ----------
+create schema t;
+create table t.results (n serial, label text, passed boolean);
+grant usage on schema t to anon, authenticated;
+grant all on t.results to anon, authenticated;
+grant usage on sequence t.results_n_seq to anon, authenticated;
+
+create function t.ok(p_cond boolean, p_label text) returns void language plpgsql as $$
+begin
+  insert into t.results (label, passed) values (p_label, coalesce(p_cond, false));
+  if not coalesce(p_cond, false) then raise warning 'ÉCHEC : %', p_label; end if;
+end $$;
+
+create function t.throws(p_sql text, p_code text, p_label text) returns void language plpgsql as $$
+declare v_hint text; v_msg text;
+begin
+  begin
+    execute p_sql;
+  exception when others then
+    get stacked diagnostics v_hint = pg_exception_hint, v_msg = message_text;
+    perform t.ok(coalesce(v_hint, '') = p_code,
+                 p_label || case when coalesce(v_hint, '') = p_code then ''
+                            else ' [reçu : ' || coalesce(v_hint, '-') || ' / ' || v_msg || ']' end);
+    return;
+  end;
+  perform t.ok(false, p_label || ' [aucune erreur]');
+end $$;
+
+create function t.fails(p_sql text, p_label text) returns void language plpgsql as $$
+begin
+  begin
+    execute p_sql;
+  exception when others then
+    perform t.ok(true, p_label);
+    return;
+  end;
+  perform t.ok(false, p_label || ' [aucune erreur]');
+end $$;
+
+create function t.login(p_uid uuid) returns void language sql as $$
+  select set_config('request.jwt.claim.sub', coalesce(p_uid::text, ''), false);
+$$;
+create function t.z(p_name text) returns int language sql stable as $$
+  select id from public.zones where name = p_name;
+$$;
+grant execute on all functions in schema t to anon, authenticated;
+
+-- ---------- Comptes ----------
+insert into auth.users (id, email, email_confirmed_at) values
+  ('bbbbbbbb-0000-0000-0000-000000000001', 'Demba.sacko20@gmail.com', now()),  -- fondateur
+  ('bbbbbbbb-0000-0000-0000-000000000002', 'demba.sacko20@gmail.com', null),   -- faux, non vérifié
+  ('bbbbbbbb-0000-0000-0000-000000000011', 'boucherie@test.fr', now()),
+  ('bbbbbbbb-0000-0000-0000-000000000012', 'resto@test.fr', now()),
+  ('bbbbbbbb-0000-0000-0000-000000000021', 'client1@test.fr', now()),
+  ('bbbbbbbb-0000-0000-0000-000000000022', 'client2@test.fr', now());
+
+\set admin 'bbbbbbbb-0000-0000-0000-000000000001'
+\set fake 'bbbbbbbb-0000-0000-0000-000000000002'
+\set m1 'bbbbbbbb-0000-0000-0000-000000000011'
+\set m2 'bbbbbbbb-0000-0000-0000-000000000012'
+\set c1 'bbbbbbbb-0000-0000-0000-000000000021'
+\set c2 'bbbbbbbb-0000-0000-0000-000000000022'
+
+-- ---------- Données de départ ----------
+select t.ok((select count(*) from zones where open) = 8, '8 départements d''Île-de-France ouverts');
+select t.ok((select discount_min = 5 and commission_rate = 5 and launch_slots = 150 and launch_free_months = 3 from settings), 'Réglages validés : 5 %, 5 %, 150 commerces, 3 mois');
+select t.ok(norm('Méchoui ÉPICÉ') = 'mechoui epice', 'Recherche sans accents');
+select t.ok(round(distance_km(48.8566, 2.3522, 48.9362, 2.3574)::numeric, 1) between 8.7 and 8.9, 'Distance Paris - Saint-Denis ≈ 8,8 km');
+
+set role authenticated;
+
+-- ---------- Fondateur ----------
+select t.login(:'admin');
+select t.ok(is_admin() and (whoami()->>'is_admin')::boolean, 'Le fondateur est administrateur');
+select t.login(:'fake');
+select t.ok(not is_admin(), 'Même e-mail non vérifié : pas administrateur');
+select t.throws($$select admin_summary()$$, 'NOT_ADMIN', 'Résumé réservé au fondateur');
+
+-- ---------- Profils et langue ----------
+select t.login(:'c1');
+insert into profiles (id, full_name, phone) values (auth.uid(), 'Karim B.', '06 12 34 56 78');
+select set_my_lang('ar');
+select t.ok((whoami()->'profile'->>'lang') = 'ar', 'Le client choisit l''arabe');
+select t.throws($$select set_my_lang('dz')$$, 'BAD_LANG', 'Langue inconnue refusée');
+select set_my_lang('fr');
+
+-- ---------- Inscription d'un commerce ----------
+select t.login(:'m1');
+select t.throws(format($$insert into shops (owner_id, name, kind, zone_id, address, lat, lng, discount_pct) values (%L, 'Boucherie Test', 'boucherie', %s, '12 rue de Paris, Saint-Denis', 48.936, 2.357, 3)$$, :'m1', t.z('Seine-Saint-Denis (93)')),
+                'DISCOUNT_TOO_LOW', 'Remise de 3 % refusée (minimum 5 %)');
+insert into shops (owner_id, name, kind, zone_id, address, lat, lng, siret, halal_cert, status, free_until)
+values (:'m1', 'Boucherie Al Baraka', 'boucherie', t.z('Seine-Saint-Denis (93)'), '12 rue de Paris, Saint-Denis', 48.9362, 2.3574,
+        '12345678901234', 'AVS', 'active', '2099-01-01');
+select id as m1shop from shops where owner_id = :'m1' \gset
+select t.ok((select status = 'pending' and not launch_offer and free_until is null and discount_pct = 5 from shops where id = :'m1shop'),
+            'Nouveau commerce : en attente, champs protégés (offre attribuée à la validation)');
+update shops set status = 'active', free_until = '2099-01-01', card_ok = true where id = :'m1shop';
+select t.ok((select status = 'pending' and not card_ok from shops where id = :'m1shop'), 'Le commerçant ne peut pas se valider lui-même');
+select t.ok(launch_slots_left() = 150, 'Inscription seule : aucune place de lancement prise');
+
+select t.login(:'c1');
+select t.ok((select count(*) from nearby_shops(48.93, 2.35, 5)) = 0, 'Commerce en attente : invisible des clients');
+select t.throws(format($$select * from create_voucher(%L)$$, :'m1shop'), 'SHOP_UNAVAILABLE', 'Pas de bon dans un commerce en attente');
+update shops set name = 'Pirate' where id = :'m1shop';
+select t.ok((select name from shops where owner_id = :'m1') is null, 'Un client ne voit pas un commerce en attente');
+
+-- ---------- Validation par le fondateur ----------
+select t.login(:'admin');
+select t.ok((select name from shops where id = :'m1shop') = 'Boucherie Al Baraka', 'Un client ne modifie pas un commerce');
+select admin_set_shop_status(:'m1shop', 'active');
+select t.ok((select status = 'active' and launch_offer and free_until = (paris_today() + interval '3 months')::date and validated_at is not null from shops where id = :'m1shop'),
+            'Commerce validé : offre de lancement, 3 mois sans commission à partir de la validation');
+select t.ok(launch_slots_left() = 149, 'Places de lancement : 149 restantes');
+-- Minimum relevé : le commerçant peut toujours modifier le reste
+reset role;
+update settings set discount_min = 10;
+set role authenticated;
+select t.login(:'m1');
+update shops set hours = 'Lun-Sam 8h-20h' where id = :'m1shop';
+select t.ok((select hours from shops where id = :'m1shop') = 'Lun-Sam 8h-20h', 'Minimum relevé : les autres modifications restent possibles');
+reset role;
+update settings set discount_min = 5;
+set role authenticated;
+select t.login(:'admin');
+select t.throws(format($$select admin_set_shop_status(%L, 'ferme')$$, :'m1shop'), 'BAD_STATUS', 'Statut inconnu refusé');
+
+-- ---------- Produits ----------
+select t.login(:'m1');
+insert into products (shop_id, name, category, unit, price_cents) values (:'m1shop', 'Merguez maison', 'Saucisses', 'kg', 1290);
+insert into products (shop_id, name, category, unit, price_cents, discount_pct) values (:'m1shop', 'Gigot d''agneau', 'Agneau', 'kg', 1990, 10);
+select t.throws(format($$insert into products (shop_id, name, unit, price_cents, discount_pct) values (%L, 'Poulet', 'kg', 690, 2)$$, :'m1shop'),
+                'DISCOUNT_TOO_LOW', 'Remise produit sous 5 % refusée');
+select t.login(:'m2');
+select t.fails(format($$insert into products (shop_id, name, unit, price_cents) values (%L, 'Intrus', 'piece', 100)$$, :'m1shop'), 'Personne d''autre n''ajoute de produit');
+
+-- ---------- Client : autour de moi et recherche ----------
+select t.login(:'c1');
+select t.ok((select count(*) from nearby_shops(48.93, 2.35, 5)) = 1, 'Le commerce validé apparaît autour du client');
+select t.ok((select distance_km between 0.5 and 1.5 and best_discount = 10 from nearby_shops(48.93, 2.35, 5)), 'Distance et meilleure remise affichées');
+select t.ok((select count(*) from nearby_shops(48.80, 2.20, 5)) = 0, 'Trop loin : pas affiché');
+select t.ok((select count(*) from nearby_shops(48.93, 2.35, 5, 'restaurant')) = 0, 'Filtre par type de commerce');
+select t.ok((select count(*) from nearby_shops(null, null, null, null, t.z('Seine-Saint-Denis (93)'))) = 1, 'Liste par département sans position');
+select t.ok((select final_cents from search_products('AGNEAU', 48.93, 2.35)) = 1791, 'Recherche : gigot à 19,90 € moins 10 % = 17,91 €');
+select t.ok((select count(*) from search_products('merguéz')) = 1, 'Recherche sans accents');
+select t.ok((select count(*) from search_products('m')) = 0, 'Recherche trop courte ignorée');
+select t.login(null);
+set role anon;
+select t.ok((select count(*) from nearby_shops(48.93, 2.35, 5)) = 1, 'Sans compte : on peut voir les commerces');
+select t.ok((select name from shops where id = :'m1shop') = 'Boucherie Al Baraka', 'Sans compte : fiche publique lisible');
+select t.fails(format($$select siret from shops where id = %L$$, :'m1shop'), 'Sans compte : SIRET et champs internes non lisibles');
+select t.fails(format($$select * from create_voucher(%L)$$, :'m1shop'), 'Sans compte : pas de bon');
+set role authenticated;
+
+-- ---------- Bon de réduction ----------
+select t.login(:'m1');
+select t.throws(format($$select * from create_voucher(%L)$$, :'m1shop'), 'OWN_SHOP', 'Pas de bon dans son propre commerce');
+select t.login(:'c1');
+select id as v1, code as v1code from create_voucher(:'m1shop') \gset
+select t.ok(:'v1code' ~ '^[A-Z2-9]{8}$', 'Code du bon : 8 caractères faciles à lire');
+select t.ok((select id from create_voucher(:'m1shop')) = :'v1', 'Redemander un bon : le même est rendu');
+select t.ok((select expires_at between now() + interval '23 hours' and now() + interval '25 hours' from vouchers where id = :'v1'), 'Bon valable 24 h');
+select t.fails(format($$insert into vouchers (code, client_id, shop_id, expires_at) values ('ABCDEFGH', %L, %L, now() + interval '1 day')$$, :'c1', :'m1shop'), 'Pas de bon créé à la main');
+
+-- ---------- Scan en caisse ----------
+select t.login(:'m2');
+select t.throws(format($$select merchant_scan(%L, 1000)$$, :'v1code'), 'NO_SHOP', 'Sans commerce : pas de scan');
+insert into shops (owner_id, name, kind, zone_id, address, lat, lng) values (:'m2', 'Resto Le Bosphore', 'restaurant', t.z('Paris (75)'), '5 rue du Faubourg, Paris', 48.87, 2.35);
+select id as m2shop from shops where owner_id = :'m2' \gset
+select t.throws(format($$select merchant_scan(%L, 1000)$$, :'v1code'), 'SHOP_NOT_ACTIVE', 'Commerce non validé : pas de scan');
+select t.login(:'admin');
+select admin_set_shop_status(:'m2shop', 'active');
+select t.login(:'m2');
+select t.throws(format($$select merchant_scan(%L, 1000)$$, :'v1code'), 'WRONG_SHOP', 'Bon d''un autre commerce refusé');
+select t.login(:'m1');
+select t.throws($$select merchant_scan('ZZZZZZZZ', 1000)$$, 'NOT_FOUND', 'Code inconnu refusé');
+select t.throws(format($$select merchant_scan(%L, 0)$$, :'v1code'), 'BAD_AMOUNT', 'Montant nul refusé');
+select t.throws(format($$select merchant_scan(%L, 9000000)$$, :'v1code'), 'BAD_AMOUNT', 'Montant trop élevé refusé');
+select merchant_scan(lower(:'v1code'), 1900) as scan1 \gset
+select t.ok((:'scan1'::jsonb->>'commission_cents')::int = 95 and (:'scan1'::jsonb->>'free')::boolean,
+            'Achat de 19,00 € : commission 0,95 €, offerte pendant le lancement');
+select t.ok((select status from vouchers where id = :'v1') = 'used', 'Bon utilisé');
+select t.throws(format($$select merchant_scan(%L, 1900)$$, :'v1code'), 'ALREADY_USED', 'Un bon ne sert qu''une fois');
+select t.login(:'c1');
+select id as v2code from create_voucher(:'m1shop') \gset
+select code as v2code from vouchers where id = :'v2code' \gset
+select t.login(:'m1');
+select t.throws(format($$select merchant_scan(%L, 500)$$, :'v2code'), 'TOO_SOON', 'Deux achats du même client en 2 h : refusé');
+
+-- ---------- Confirmation par le client ----------
+select t.login(:'c2');
+select t.ok((select count(*) from purchases) = 0, 'Un autre client ne voit pas l''achat');
+select t.login(:'c1');
+select id as p1 from purchases where client_id = :'c1' \gset
+select t.ok((whoami()->>'pending_purchases')::int = 1, 'Le client a un achat à confirmer');
+select client_answer_purchase(:'p1', true);
+select t.ok((select status from purchases where id = :'p1') = 'confirmed', 'Le client confirme le montant');
+select t.throws(format($$select client_answer_purchase(%L, true)$$, :'p1'), 'NOT_FOUND', 'Déjà confirmé');
+select t.fails(format($$update purchases set amount_cents = 1 where id = %L$$, :'p1'), 'Le client ne modifie pas le montant');
+
+-- ---------- Après l'offre de lancement : commission due ----------
+select t.login(:'admin');
+update shops set free_until = paris_today() - 1 where id = :'m1shop';
+select t.login(:'c2');
+select code as v3code from create_voucher(:'m1shop') \gset
+select t.login(:'m1');
+select merchant_scan(:'v3code', 4000) as scan3 \gset
+select t.ok((:'scan3'::jsonb->>'commission_cents')::int = 200 and not (:'scan3'::jsonb->>'free')::boolean, 'Achat de 40,00 € : commission 2,00 € due');
+select t.login(:'c2');
+select id as p3 from purchases where client_id = :'c2' \gset
+select t.throws(format($$select client_answer_purchase(%L, false, 'x')$$, :'p3'), 'BAD_REASON', 'Contestation sans explication refusée');
+select client_answer_purchase(:'p3', false, 'J''ai payé 30 €, pas 40 €');
+select t.ok((select status from purchases where id = :'p3') = 'disputed' and exists (select 1 from reports where purchase_id = :'p3'), 'Contestation enregistrée et signalée');
+select t.login(:'admin');
+select t.ok((admin_summary()->>'disputes_open')::int = 1, 'Le fondateur voit la contestation');
+select admin_resolve_purchase(:'p3', 'confirmed');
+select t.ok((select status from purchases where id = :'p3') = 'confirmed' and not exists (select 1 from reports where purchase_id = :'p3' and status = 'open'),
+            'Le fondateur tranche : achat confirmé, signalement clos');
+
+select t.login(:'m1');
+select t.ok((merchant_stats()->>'commission_due_cents')::int = 200 and (merchant_stats()->>'commission_offered_cents')::int = 95
+            and (merchant_stats()->>'today_cents')::int = 5900 and (merchant_stats()->>'clients_count')::int = 2,
+            'Compte du commerçant : ventes du jour, commission due et offerte');
+
+-- ---------- Tâches automatiques et prélèvement de la semaine ----------
+reset role;
+select t.login(:'c1');
+-- Un achat sans réponse depuis 25 h est confirmé tout seul
+update purchases set created_at = now() - interval '3 hours' where id = :'p1';
+insert into vouchers (id, code, client_id, shop_id, expires_at, status) values ('cccccccc-0000-0000-0000-000000000001', 'AUTOAUTO', :'c1', :'m2shop', now() + interval '1 day', 'used');
+insert into purchases (id, voucher_id, shop_id, client_id, amount_cents, discount_pct, commission_rate, commission_cents, free, week_start, created_at)
+values ('cccccccc-0000-0000-0000-0000000000a1', 'cccccccc-0000-0000-0000-000000000001', :'m2shop', :'c1', 1000, 5, 5, 50, false, week_of(now()) - 7, now() - interval '25 hours');
+update vouchers set expires_at = now() - interval '1 minute' where code = :'v2code';
+update purchases set week_start = week_of(now()) - 7 where id = :'p3';
+select souki_deals_tick() as tick1 \gset
+select t.ok((select status from purchases where id = 'cccccccc-0000-0000-0000-0000000000a1') = 'confirmed', 'Sans réponse en 24 h : achat confirmé automatiquement');
+select t.ok((select count(*) from vouchers where status = 'expired') >= 1, 'Bons périmés expirés');
+select t.ok((select amount_cents from charges where shop_id = :'m1shop') = 200 and (select amount_cents from charges where shop_id = :'m2shop') = 50,
+            'Lundi : prélèvement de la semaine passée par commerce');
+select souki_deals_tick();
+select t.ok((select count(*) from charges) = 2 and (select amount_cents from charges where shop_id = :'m1shop') = 200, 'Pas de double prélèvement');
+select t.ok((select charge_id is not null from purchases where id = :'p3'), 'Achat rattaché à son prélèvement');
+-- Un prélèvement déjà payé n'est plus modifié : l'achat confirmé en retard attend le suivant
+update charges set status = 'paid' where shop_id = :'m2shop';
+insert into vouchers (id, code, client_id, shop_id, expires_at, status) values ('cccccccc-0000-0000-0000-000000000002', 'LATELATE', :'c2', :'m2shop', now() + interval '1 day', 'used');
+insert into purchases (id, voucher_id, shop_id, client_id, amount_cents, discount_pct, commission_rate, commission_cents, free, status, week_start)
+values ('cccccccc-0000-0000-0000-0000000000a2', 'cccccccc-0000-0000-0000-000000000002', :'m2shop', :'c2', 2000, 5, 5, 100, false, 'confirmed', week_of(now()) - 7);
+select souki_deals_tick();
+select t.ok((select amount_cents from charges where shop_id = :'m2shop') = 50 and (select charge_id is null from purchases where id = 'cccccccc-0000-0000-0000-0000000000a2'),
+            'Prélèvement payé : non modifié, l''achat en retard attend le prochain');
+update charges set status = 'pending' where shop_id = :'m2shop';
+set role authenticated;
+
+select t.login(:'m1');
+select t.ok((select count(*) from charges) = 1, 'Le commerçant voit son prélèvement, pas celui des autres');
+select t.ok((merchant_stats()->>'commission_due_cents')::int = 0, 'Commission due remise à zéro après prélèvement');
+select t.login(:'c1');
+select t.ok((select count(*) from charges) = 0, 'Un client ne voit aucun prélèvement');
+
+-- Prélèvement refusé : commerce masqué jusqu'au paiement
+select t.login(:'admin');
+select id as ch1 from charges where shop_id = :'m1shop' \gset
+select admin_set_charge_status(:'ch1', 'failed');
+select t.login(:'c1');
+select t.ok(not exists (select 1 from nearby_shops(48.93, 2.35, 5) where id = :'m1shop'), 'Prélèvement refusé : commerce masqué');
+select t.throws(format($$select * from create_voucher(%L)$$, :'m1shop'), 'SHOP_UNAVAILABLE', 'Commerce masqué : pas de nouveau bon');
+select t.login(:'admin');
+select admin_set_charge_status(:'ch1', 'paid');
+select t.login(:'c1');
+select t.ok(exists (select 1 from nearby_shops(48.93, 2.35, 5) where id = :'m1shop'), 'Payé : commerce de nouveau visible');
+
+-- ---------- Limites ----------
+select t.login(:'admin');
+select admin_update_settings(5, 5, 24, 1, 120, 50000, 24, 150, 3);
+select t.throws($$select admin_update_settings(5, 40, 24, 5, 120, 50000, 24, 150, 3)$$, 'BAD_SETTINGS', 'Commission de 40 % refusée');
+select t.login(:'c2');
+select * from create_voucher(:'m2shop');
+select t.throws(format($$select * from create_voucher(%L)$$, :'m1shop'), 'TOO_MANY', 'Nombre de bons actifs limité');
+select cancel_voucher((select id from vouchers where client_id = :'c2' and status = 'active'));
+select t.ok((select count(*) from vouchers where client_id = :'c2' and status = 'active') = 0, 'Le client annule son bon');
+select t.login(:'admin');
+select admin_update_settings(5, 5, 24, 5, 120, 50000, 24, 150, 3);
+
+-- ---------- Signalements ----------
+select t.login(:'c1');
+select t.throws(format($$select report_create(%L, 'spam', 'texte')$$, :'m1shop'), 'BAD_KIND', 'Type de signalement inconnu refusé');
+select t.ok(report_create(:'m1shop', 'prix', 'Le gigot est à 22 € en magasin', (select id from products where name = 'Gigot d''agneau')) > 0, 'Prix faux signalé');
+select t.login(:'admin');
+select t.ok((admin_summary()->>'reports_open')::int = 1, 'Le fondateur voit le signalement');
+select admin_close_report((select id from reports where status = 'open' limit 1));
+select t.ok((admin_summary()->>'reports_open')::int = 0, 'Signalement traité');
+
+-- ---------- Zones ----------
+select admin_set_zone_open(t.z('Seine-Saint-Denis (93)'), false);
+select t.login(:'c1');
+select t.ok(not exists (select 1 from nearby_shops(48.93, 2.35, 5)), 'Zone fermée : commerces invisibles');
+select t.login(:'admin');
+select admin_set_zone_open(t.z('Seine-Saint-Denis (93)'), true);
+
+-- ---------- Résumé ----------
+select t.ok((admin_summary()->>'shops_active')::int = 2 and (admin_summary()->>'launch_slots_left')::int = 148, 'Résumé du fondateur');
+select t.login(:'c1');
+select t.throws($$select merchant_stats()$$, 'NO_SHOP', 'Un client n''a pas de tableau de commerçant');
+
+-- ---------- Bilan ----------
+reset role;
+\o
+\set QUIET off
+select count(*) filter (where passed) as reussis, count(*) filter (where not passed) as echecs from t.results;
+select label from t.results where not passed;
+do $$ begin
+  if exists (select 1 from t.results where not passed) then
+    raise exception 'Des tests ont échoué';
+  end if;
+end $$;

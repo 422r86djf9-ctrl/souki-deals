@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "Souki Deals",
+    "slug": "souki-deals",
+    "scheme": "soukideals",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "fr.soukideals.app",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "fr.soukideals.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#4A1650"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Souki Deals utilise l'appareil photo pour scanner les bons de réduction des clients en caisse."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Souki Deals utilise votre position pour afficher les commerces halal les plus proches."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "supabaseUrl": "A_REMPLIR",
+      "supabasePublishableKey": "A_REMPLIR"
+    },
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#4A1650"
+    }
+  }
+}
