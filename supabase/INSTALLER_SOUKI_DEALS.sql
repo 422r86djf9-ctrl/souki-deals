@@ -1,8 +1,5 @@
--- =====================================================================
--- SOUKI DEALS — INSTALLATEUR COMPLET (à coller dans Supabase > SQL Editor > Run)
--- Réinstalle toute la base de test. Les comptes utilisateurs sont conservés.
--- =====================================================================
 begin;
+-- SOUKI DEALS : installateur complet, a coller dans Supabase > SQL Editor > Run.
 
 -- >>> 000_remise_a_zero.sql
 -- =====================================================================
