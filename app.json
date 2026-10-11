@@ -37,13 +37,17 @@
     },
     "extra": {
       "supabaseUrl": "https://rczotdgtkwfbnrbvyjon.supabase.co",
-      "supabasePublishableKey": "sb_publishable_WuIm_jhdaazGAXPQK5tq-w_Rb-PUE1i"
+      "supabasePublishableKey": "sb_publishable_WuIm_jhdaazGAXPQK5tq-w_Rb-PUE1i",
+      "eas": {
+        "projectId": "ca9a0853-76f5-42ce-bc71-850f008dae6c"
+      }
     },
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#4A1650"
-    }
+    },
+    "owner": "sacko-dembas-team"
   }
 }
