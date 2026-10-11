@@ -36,8 +36,8 @@
       "typedRoutes": false
     },
     "extra": {
-      "supabaseUrl": "A_REMPLIR",
-      "supabasePublishableKey": "A_REMPLIR"
+      "supabaseUrl": "https://rczotdgtkwfbnrbvyjon.supabase.co",
+      "supabasePublishableKey": "sb_publishable_WuIm_jhdaazGAXPQK5tq-w_Rb-PUE1i"
     },
     "icon": "./assets/icon.png",
     "splash": {

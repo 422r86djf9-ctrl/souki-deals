@@ -27,6 +27,6 @@ Le halal au meilleur prix, près de chez vous. Appli Android et iPhone (Expo SDK
 - Un prélèvement payé, refusé ou offert n'est plus modifié ; les achats confirmés en retard partent dans le prélèvement suivant.
 
 ## Configuration
-- `app.json` > `extra` : `supabaseUrl` et `supabasePublishableKey` du projet Supabase (à remplir).
+- Supabase : projet « Souki Deals » `https://rczotdgtkwfbnrbvyjon.supabase.co` (région Europe), clé publique dans `app.json` > `extra`. Installateur appliqué le 11/10/2026, pg_cron actif.
 - Projet Expo à créer (`souki-deals`) et `extra.eas.projectId` à ajouter.
 - Builds EAS depuis GitHub, profil `test` (APK).
