@@ -1,19 +1,54 @@
-// Connexion par e-mail et mot de passe
+// Connexion : on choisit d'abord son espace (particulier ou commerçant), puis e-mail et mot de passe
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { LanguagePicker } from '../src/components/LanguagePicker';
+import { Espace, getEspace, setEspace } from '../src/lib/espace';
 import { t } from '../src/lib/i18n';
 import { errorMessage, supabase } from '../src/lib/supabase';
-import { Button, colors, ErrorText, Field, InfoText, Muted } from '../src/lib/theme';
+import { Button, colors, ErrorText, Field, InfoText, Muted, styles } from '../src/lib/theme';
+
+function ChoiceCard({ title, subtitle, onPress, strong }: { title: string; subtitle: string; onPress: () => void; strong?: boolean }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        styles.card,
+        { paddingVertical: 20 },
+        strong && { backgroundColor: colors.prune, borderColor: colors.prune },
+        pressed && { opacity: 0.85 },
+      ]}
+    >
+      <Text style={{ fontSize: 20, fontWeight: '800', color: strong ? '#fff' : colors.prune }}>{title}</Text>
+      <Text style={{ fontSize: 15, marginTop: 4, color: strong ? colors.pruneSoft : colors.muted }}>{subtitle}</Text>
+    </Pressable>
+  );
+}
 
 export default function Connexion() {
+  const [espace, setEspaceState] = useState<Espace | null>(null);
+  const [ready, setReady] = useState(false);
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
+
+  useEffect(() => {
+    getEspace().then((e) => {
+      setEspaceState(e);
+      setReady(true);
+    });
+  }, []);
+
+  async function choose(e: Espace | null) {
+    setError('');
+    setInfo('');
+    setEspaceState(e);
+    await setEspace(e);
+  }
 
   async function submit() {
     setError('');
@@ -40,17 +75,66 @@ export default function Connexion() {
     }
   }
 
+  const header = (
+    <>
+      <LanguagePicker />
+      <Image source={require('../assets/icon.png')} style={{ width: 84, height: 84, borderRadius: 20, marginBottom: 12 }} />
+      <Text style={{ fontSize: 38, fontWeight: '900', color: colors.prune }}>
+        Souki <Text style={{ color: colors.saffronDark }}>Deals</Text>
+      </Text>
+      <Text style={{ fontSize: 17, fontWeight: '600', color: colors.prune, marginBottom: 24 }}>
+        {t('Le halal au meilleur prix, près de chez vous')}
+      </Text>
+    </>
+  );
+
+  if (!ready) return <ActivityIndicator style={{ marginTop: 60 }} color={colors.prune} />;
+
+  // Étape 1 : choisir son espace
+  if (!espace) {
+    return (
+      <ScrollView style={{ backgroundColor: colors.background }} contentContainerStyle={{ padding: 20, paddingTop: 32 }}>
+        {header}
+        <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text, marginBottom: 12 }}>{t('Vous êtes :')}</Text>
+        <ChoiceCard
+          title={t('Particulier')}
+          subtitle={t('Je cherche les meilleures remises halal près de chez moi.')}
+          onPress={() => choose('particulier')}
+          strong
+        />
+        <ChoiceCard
+          title={t('Commerçant')}
+          subtitle={t('Je veux inscrire mon commerce et attirer de nouveaux clients.')}
+          onPress={() => choose('commercant')}
+        />
+      </ScrollView>
+    );
+  }
+
+  // Étape 2 : e-mail et mot de passe
+  const pro = espace === 'commercant';
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView style={{ backgroundColor: colors.background }} contentContainerStyle={{ padding: 20, paddingTop: 32 }} keyboardShouldPersistTaps="handled">
-        <LanguagePicker />
-        <Image source={require('../assets/icon.png')} style={{ width: 84, height: 84, borderRadius: 20, marginBottom: 12 }} />
-        <Text style={{ fontSize: 38, fontWeight: '900', color: colors.prune }}>
-          Souki <Text style={{ color: colors.saffronDark }}>Deals</Text>
-        </Text>
-        <Text style={{ fontSize: 17, fontWeight: '600', color: colors.prune, marginBottom: 24 }}>
-          {t('Le halal au meilleur prix, près de chez vous')}
-        </Text>
+        {header}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <Text
+            style={{
+              backgroundColor: pro ? colors.saffron : colors.pruneSoft,
+              color: colors.prune,
+              fontWeight: '800',
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 99,
+              overflow: 'hidden',
+            }}
+          >
+            {pro ? t('Espace commerçant') : t('Espace particulier')}
+          </Text>
+          <Pressable onPress={() => choose(null)} accessibilityRole="button" style={{ paddingVertical: 6, paddingHorizontal: 4 }}>
+            <Text style={{ color: colors.prune, fontWeight: '700', textDecorationLine: 'underline' }}>{t('Changer')}</Text>
+          </Pressable>
+        </View>
         <Field label={t('E-mail')} value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" placeholder="exemple@gmail.com" />
         <Field
           label={t('Mot de passe')}
@@ -77,7 +161,11 @@ export default function Connexion() {
           </Text>
         </Pressable>
         <View style={{ marginTop: 28 }}>
-          <Muted>{t('Un seul compte suffit : obtenez vos bons de réduction, ou inscrivez votre commerce.')}</Muted>
+          <Muted>
+            {pro
+              ? t('Après la connexion, inscrivez votre commerce : rien à payer si on ne vous amène pas de clients.')
+              : t('Obtenez vos bons de réduction chez les commerces halal autour de vous.')}
+          </Muted>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

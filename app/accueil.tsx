@@ -1,6 +1,7 @@
 import { Href, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Espace, getEspace, setEspace } from '../src/lib/espace';
 import { t } from '../src/lib/i18n';
 import { errorMessage, supabase, whoami, Whoami } from '../src/lib/supabase';
 import { Button, colors, ErrorText, Muted, styles } from '../src/lib/theme';
@@ -45,6 +46,7 @@ function shopBadge(s: NonNullable<Whoami['shop']>) {
 
 export default function Accueil() {
   const [me, setMe] = useState<Whoami | null>(null);
+  const [espace, setEspaceState] = useState<Espace>('particulier');
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
@@ -54,6 +56,9 @@ export default function Accueil() {
       const data = await whoami();
       if (!data.user_id) return router.replace('/connexion');
       if (!data.profile?.full_name) return router.replace('/profil');
+      // Sans choix enregistré : commerçant s'il a déjà un commerce, sinon particulier
+      const e = (await getEspace()) ?? (data.shop ? 'commercant' : 'particulier');
+      setEspaceState(e);
       setMe(data);
     } catch (e) {
       setError(errorMessage(e));
@@ -65,6 +70,12 @@ export default function Accueil() {
       load();
     }, [load]),
   );
+
+  async function switchEspace() {
+    const e: Espace = espace === 'commercant' ? 'particulier' : 'commercant';
+    await setEspace(e);
+    setEspaceState(e);
+  }
 
   async function logout() {
     await supabase.auth.signOut();
@@ -92,34 +103,50 @@ export default function Accueil() {
       }
     >
       <Text style={{ fontSize: 26, fontWeight: '800', color: colors.text }}>{t('Bonjour {name}', { name: firstName })}</Text>
-      <Muted>{t('Le halal au meilleur prix, près de chez vous')}</Muted>
+      <Muted>{espace === 'commercant' ? t('Espace commerçant') : t('Le halal au meilleur prix, près de chez vous')}</Muted>
       <View style={{ height: 18 }} />
       <ErrorText>{error}</ErrorText>
 
       {me ? (
         <>
-          {pending > 0 ? (
+          {espace === 'commercant' ? (
             <Card
-              title={pending > 1 ? t('{n} achats à confirmer', { n: pending }) : t('{n} achat à confirmer', { n: pending })}
-              subtitle={t('Vérifiez le montant payé en caisse.')}
-              href="/achats"
+              title={me.shop ? me.shop.name : t('Inscrire mon commerce')}
+              subtitle={me.shop ? t('Scanner un bon, mes produits, mon compte.') : t('Attirez de nouveaux clients : rien à payer si on ne vous en amène pas.')}
+              badge={me.shop ? shopBadge(me.shop) : undefined}
+              href={me.shop ? '/commercant' : '/commercant/inscription'}
               strong
             />
-          ) : null}
-          <Card title={t('Autour de moi')} subtitle={t('Boucheries, restaurants, épiceries halal près de vous, avec leur remise.')} href="/autour" />
-          <Card title={t('Chercher un produit')} subtitle={t('Merguez, agneau, poulet… le moins cher autour de vous.')} href="/recherche" />
-          <Card title={t('Mes bons et achats')} subtitle={t('Vos QR codes de réduction et vos économies.')} href="/achats" />
-          <Card
-            title={me.shop ? me.shop.name : t('Inscrire mon commerce')}
-            subtitle={me.shop ? t('Scanner un bon, mes produits, mon compte.') : t('Attirez de nouveaux clients : rien à payer si on ne vous en amène pas.')}
-            badge={me.shop ? shopBadge(me.shop) : undefined}
-            href={me.shop ? '/commercant' : '/commercant/inscription'}
-          />
+          ) : (
+            <>
+              {pending > 0 ? (
+                <Card
+                  title={pending > 1 ? t('{n} achats à confirmer', { n: pending }) : t('{n} achat à confirmer', { n: pending })}
+                  subtitle={t('Vérifiez le montant payé en caisse.')}
+                  href="/achats"
+                  strong
+                />
+              ) : null}
+              <Card title={t('Autour de moi')} subtitle={t('Boucheries, restaurants, épiceries halal près de vous, avec leur remise.')} href="/autour" />
+              <Card title={t('Chercher un produit')} subtitle={t('Merguez, agneau, poulet… le moins cher autour de vous.')} href="/recherche" />
+              <Card title={t('Mes bons et achats')} subtitle={t('Vos QR codes de réduction et vos économies.')} href="/achats" />
+              {me.shop ? (
+                <Card title={me.shop.name} subtitle={t('Scanner un bon, mes produits, mon compte.')} badge={shopBadge(me.shop)} href="/commercant" />
+              ) : null}
+            </>
+          )}
           {me.is_admin ? <Card title={t('Administration')} subtitle={t('Commerces, contestations, commissions, réglages.')} badge={t('Fondateur')} href="/admin" /> : null}
         </>
       ) : null}
 
       <View style={{ height: 12 }} />
+      {me ? (
+        <Button
+          title={espace === 'commercant' ? t('Passer à l’espace particulier') : t('Passer à l’espace commerçant')}
+          variant="secondary"
+          onPress={switchEspace}
+        />
+      ) : null}
       <Button title={t('Mon profil')} variant="secondary" onPress={() => router.push('/profil')} />
       <Button title={t('Se déconnecter')} variant="secondary" onPress={logout} />
     </ScrollView>
