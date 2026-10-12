@@ -37,6 +37,7 @@ export type Whoami = {
   profile?: { full_name: string | null; phone: string | null; lang?: string | null } | null;
   shop?: { id: string; name: string; status: 'pending' | 'active' | 'suspended'; launch_offer: boolean; free_until: string | null; blocked: boolean } | null;
   pending_purchases?: number;
+  visits_to_answer?: number;
 };
 
 export async function whoami(): Promise<Whoami> {

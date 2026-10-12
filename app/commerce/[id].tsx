@@ -112,7 +112,8 @@ export default function Commerce() {
         </View>
       </View>
 
-      <Button title={t('Obtenir mon bon de réduction')} variant="accent" onPress={getVoucher} loading={busy} />
+      <Button title={t('Je suis dans le magasin : scanner son QR code')} variant="accent" onPress={() => router.push('/entree')} />
+      <Button title={t('Obtenir mon bon de réduction')} variant="secondary" onPress={getVoucher} loading={busy} />
       <Muted>{t('Montrez le QR code en caisse : la remise est appliquée sur votre ticket.')}</Muted>
       <ErrorText>{error}</ErrorText>
       <InfoText>{info}</InfoText>

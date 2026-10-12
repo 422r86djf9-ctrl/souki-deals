@@ -6,7 +6,8 @@ import { codeFromScan } from '../lib/deals';
 import { t } from '../lib/i18n';
 import { Button, Muted } from '../lib/theme';
 
-export function Scanner({ onCode }: { onCode: (code: string) => void }) {
+// parse : lit le code dans le QR (par défaut, le code d'un bon client)
+export function Scanner({ onCode, parse = codeFromScan, hint }: { onCode: (code: string) => void; parse?: (data: string) => string | null; hint?: string }) {
   const [permission, requestPermission] = useCameraPermissions();
   const done = useRef(false);
 
@@ -14,7 +15,7 @@ export function Scanner({ onCode }: { onCode: (code: string) => void }) {
   if (!permission.granted) {
     return (
       <View>
-        <Muted>{t("Autorisez l'appareil photo pour scanner les bons. Vous pouvez aussi taper le code.")}</Muted>
+        <Muted>{hint ?? t("Autorisez l'appareil photo pour scanner les bons. Vous pouvez aussi taper le code.")}</Muted>
         <Button title={t("Autoriser l'appareil photo")} variant="secondary" onPress={requestPermission} />
       </View>
     );
@@ -26,7 +27,7 @@ export function Scanner({ onCode }: { onCode: (code: string) => void }) {
         facing="back"
         barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
         onBarcodeScanned={(r) => {
-          const code = codeFromScan(r.data ?? '');
+          const code = parse(r.data ?? '');
           if (code && !done.current) {
             done.current = true;
             onCode(code);

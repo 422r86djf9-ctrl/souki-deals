@@ -86,6 +86,7 @@ export default function Accueil() {
 
   const firstName = me?.profile?.full_name?.split(' ')[0] ?? '';
   const pending = me?.pending_purchases ?? 0;
+  const visits = me?.visits_to_answer ?? 0;
 
   return (
     <ScrollView
@@ -127,6 +128,15 @@ export default function Accueil() {
                   strong
                 />
               ) : null}
+              {visits > 0 ? (
+                <Card
+                  title={t('Avez-vous acheté ?')}
+                  subtitle={t('Une visite sans montant saisi : dites-nous ce qui s’est passé.')}
+                  href="/achats"
+                  strong
+                />
+              ) : null}
+              <Card title={t('Je suis dans le magasin')} subtitle={t('Scannez le QR code Souki Deals au comptoir pour avoir votre remise.')} href="/entree" strong />
               <Card title={t('Autour de moi')} subtitle={t('Boucheries, restaurants, épiceries halal près de vous, avec leur remise.')} href="/autour" />
               <Card title={t('Chercher un produit')} subtitle={t('Merguez, agneau, poulet… le moins cher autour de vous.')} href="/recherche" />
               <Card title={t('Mes bons et achats')} subtitle={t('Vos QR codes de réduction et vos économies.')} href="/achats" />

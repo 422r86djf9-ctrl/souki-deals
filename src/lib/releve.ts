@@ -255,3 +255,6 @@ export const shareStatementPdf = (s: Statement) => sharePdf(statementHtml(s), `S
 export const shareInvoicesCsv = (s: Statement) => shareCsv(invoicesCsv(s), `Souki-Deals-factures-${s.year}-${slug(s.shop.name)}`);
 export const sharePurchasesCsv = (s: Statement) => shareCsv(purchasesCsv(s), `Souki-Deals-achats-${s.year}-${slug(s.shop.name)}`);
 export const shareConditionsPdf = (p: TermsParams) => sharePdf(conditionsHtml(p), `Souki-Deals-conditions${p.shop ? `-${slug(p.shop.name)}` : ''}`);
+
+// PDF libre (autocollant du QR code du magasin…)
+export const shareHtmlAsPdf = (html: string, name: string) => sharePdf(html, name);

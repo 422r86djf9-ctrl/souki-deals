@@ -2,6 +2,7 @@
 import { Stack, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ClientsPresents } from '../../src/components/ClientsPresents';
 import { TERMS_VERSION } from '../../src/lib/conditions';
 import { euros, fullDate, Invoice, invoiceEmailLabel, shortDate, timeLabel } from '../../src/lib/deals';
 import { t } from '../../src/lib/i18n';
@@ -162,7 +163,15 @@ export default function Commercant() {
             </View>
           ) : null}
 
-          <Button title={t('Scanner un bon client')} variant="accent" onPress={() => router.push('/commercant/scanner')} disabled={stats.status !== 'active'} />
+          <ClientsPresents active={stats.status === 'active'} discountPct={Number(stats.discount_pct)} onPurchase={load} />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Button title={t('QR code du magasin')} variant="accent" onPress={() => router.push('/commercant/qr')} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button title={t('Scanner un bon client')} variant="secondary" onPress={() => router.push('/commercant/scanner')} disabled={stats.status !== 'active'} />
+            </View>
+          </View>
 
           <SectionTitle>{t('Ce que Souki Deals vous a amené')}</SectionTitle>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>

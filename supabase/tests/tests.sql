@@ -399,6 +399,76 @@ select t.login(:'c1');
 select t.throws($$select merchant_year_statement(2026)$$, 'NO_SHOP', 'Un client n''a pas de relevé');
 select t.throws($$select merchant_accept_terms()$$, 'NO_SHOP', 'Un client n''accepte pas de conditions commerçant');
 
+-- ---------- Scan inversé : le client scanne le QR code du magasin ----------
+select t.login(:'m2');
+select shop_code as m2code from shops where id = :'m2shop' \gset
+select t.ok(:'m2code' ~ '^[A-Z2-9]{8}$' and (select count(distinct shop_code) = count(*) from shops), 'Chaque commerce a un code fixe et unique');
+update shops set shop_code = 'AAAAAAAA' where id = :'m2shop';
+select t.ok((select shop_code from shops where id = :'m2shop') = :'m2code', 'Le commerçant ne change pas son code');
+select t.throws($$select client_checkin('SOUKIDEALS:SHOP:' || shop_code) from shops where owner_id = auth.uid()$$, 'OWN_SHOP', 'Pas de visite dans son propre commerce');
+select t.login(:'c1');
+select t.throws($$select client_checkin('SOUKIDEALS:SHOP:ZZZZZZZZ')$$, 'NOT_FOUND', 'QR code inconnu refusé');
+select client_checkin('SOUKIDEALS:SHOP:' || :'m2code') as ck1 \gset
+select (:'ck1'::jsonb->>'checkin_id') as ck1id, (:'ck1'::jsonb->>'code') as ck1code \gset
+select t.ok(:'ck1'::jsonb->>'status' = 'waiting' and (:'ck1'::jsonb->>'discount_pct')::numeric = 5, 'Visite enregistrée, en attente du montant');
+select t.ok((client_checkin(lower(:'m2code'))->>'checkin_id') = :'ck1id', 'Rescanner : même visite (code seul accepté)');
+select t.login(:'m2');
+select t.ok((select count(*) = 1 and min(first_name) = 'Karim' and min(code) = :'ck1code' from merchant_checkins()), 'La tablette voit le client présent (prénom seulement)');
+select t.login(:'m1');
+select t.ok((select count(*) from merchant_checkins()) = 0, 'Un autre commerce ne voit pas ce client');
+select t.throws(format($$select merchant_complete_checkin(%L, 1000)$$, :'ck1id'), 'NOT_FOUND', 'Un autre commerce ne saisit pas le montant');
+select t.login(:'m2');
+select t.throws(format($$select merchant_complete_checkin(%L, 0)$$, :'ck1id'), 'BAD_AMOUNT', 'Montant vérifié comme au scan');
+select merchant_complete_checkin(:'ck1id', 2500);
+select t.ok((select status = 'done' and purchase_id is not null from checkins where id = :'ck1id')
+            and (select status = 'used' from vouchers where code = :'ck1code')
+            and (select amount_cents = 2500 and status = 'pending' and client_id = :'c1' from purchases where id = (select purchase_id from checkins where id = :'ck1id')),
+            'Montant saisi : achat créé, bon utilisé, le client doit confirmer');
+select t.throws(format($$select merchant_complete_checkin(%L, 2500)$$, :'ck1id'), 'ALREADY_DONE', 'Pas deux fois le même achat');
+select t.login(:'c1');
+select t.throws(format($$select client_checkin(%L)$$, :'m2code'), 'TOO_SOON', 'Nouvelle visite trop tôt après un achat');
+-- Le commerçant dit « pas d'achat » : le client répond
+select shop_code as m1code from shops where id = :'m1shop' \gset
+select (client_checkin(:'m1code')->>'checkin_id') as ck2id \gset
+select t.login(:'m1');
+select merchant_dismiss_checkin(:'ck2id');
+select t.login(:'c1');
+select t.ok((whoami()->>'visits_to_answer')::int = 1, 'Le client doit dire s''il a acheté');
+select client_answer_checkin(:'ck2id', true);
+select t.ok((select client_answer = 'bought' from checkins where id = :'ck2id'), 'Le client dit avoir acheté');
+select t.throws(format($$select client_answer_checkin(%L, false)$$, :'ck2id'), 'NOT_FOUND', 'Une seule réponse');
+select t.login(:'admin');
+select t.ok(exists (select 1 from reports where shop_id = :'m1shop' and kind = 'achat' and body like 'Achat sans scan%' and status = 'open'),
+            'Achat sans scan : signalement pour le fondateur');
+select t.ok((select level = 'orange' and claimed = 1 from admin_shop_scores() where shop_id = :'m1shop'), 'Score de méfiance : commerce en orange');
+select t.ok((select level = 'ok' from admin_shop_scores() where shop_id = :'m2shop'), 'Commerce sans souci : ok');
+select admin_close_report((select id from reports where body like 'Achat sans scan%' and status = 'open'));
+-- Visite sans montant à temps : expirée, le bon ne resert pas
+select t.login(:'c1');
+select (client_checkin(:'m1code')->>'checkin_id') as ck3id \gset
+select t.ok(:'ck3id' <> :'ck2id', 'Nouvelle visite après un « pas d''achat »');
+reset role;
+update checkins set expires_at = now() - interval '1 minute' where id = :'ck3id';
+select souki_deals_tick();
+select t.ok((select status = 'expired' from checkins where id = :'ck3id')
+            and (select v.status = 'expired' from vouchers v join checkins c on c.voucher_id = v.id where c.id = :'ck3id'),
+            'Visite sans montant à temps : expirée avec son bon');
+set role authenticated;
+select t.login(:'c1');
+select client_answer_checkin(:'ck3id', false);
+select t.ok((select count(*) from reports where shop_id = :'m1shop' and body like 'Achat sans scan%') = 1, '« Pas acheté » : aucun signalement');
+-- Le client annule ; puis le scan classique du bon clôt la visite
+select (client_checkin(:'m1code')->>'checkin_id') as ck4id \gset
+select client_cancel_checkin(:'ck4id');
+select t.ok((select status = 'cancelled' from checkins where id = :'ck4id'), 'Le client annule sa visite');
+select client_checkin(:'m1code') as ck5 \gset
+select t.login(:'m1');
+select merchant_scan(:'ck5'::jsonb->>'code', 1200);
+select t.ok((select status = 'done' from checkins where id = (:'ck5'::jsonb->>'checkin_id')::uuid), 'Scan classique du bon : la visite est close');
+select t.login(:'c2');
+select t.ok((select count(*) from checkins) = 0, 'Un autre client ne voit pas ces visites');
+select t.throws($$select * from admin_shop_scores()$$, 'NOT_ADMIN', 'Score réservé au fondateur');
+
 -- ---------- Limites ----------
 select t.login(:'admin');
 select admin_update_settings(5, 5, 24, 1, 120, 50000, 24, 150, 3);

@@ -1,13 +1,14 @@
 // Mes bons en cours et mes achats (avec ce que j'ai économisé)
 import { Stack, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { PurchaseAnswer } from '../src/components/PurchaseAnswer';
 import { euros, shortDate, timeLabel } from '../src/lib/deals';
 import { t } from '../src/lib/i18n';
 import { errorMessage, supabase } from '../src/lib/supabase';
-import { colors, ErrorText, Muted, SectionTitle, styles } from '../src/lib/theme';
+import { Button, colors, ErrorText, Muted, SectionTitle, styles } from '../src/lib/theme';
 
+type Visit = { id: string; created_at: string; shops: { name: string } | null };
 type V = { id: string; code: string; expires_at: string; shops: { name: string } | null };
 type P = {
   id: string;
@@ -28,6 +29,7 @@ function statusLabel(s: P['status']) {
 export default function Achats() {
   const [vouchers, setVouchers] = useState<V[]>([]);
   const [purchases, setPurchases] = useState<P[]>([]);
+  const [visits, setVisits] = useState<Visit[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -37,7 +39,7 @@ export default function Achats() {
     const { data: u } = await supabase.auth.getUser();
     const uid = u.user?.id;
     if (!uid) return;
-    const [v, p] = await Promise.all([
+    const [v, p, ck] = await Promise.all([
       supabase
         .from('vouchers')
         .select('id, code, expires_at, shops(name)')
@@ -51,10 +53,19 @@ export default function Achats() {
         .eq('client_id', uid)
         .order('created_at', { ascending: false })
         .limit(100),
+      supabase
+        .from('checkins')
+        .select('id, created_at, shops(name)')
+        .eq('client_id', uid)
+        .in('status', ['expired', 'dismissed'])
+        .is('client_answer', null)
+        .gt('created_at', new Date(Date.now() - 7 * 86400000).toISOString())
+        .order('created_at', { ascending: false }),
     ]);
     if (v.error || p.error) setError(errorMessage(v.error ?? p.error));
     setVouchers((v.data ?? []) as unknown as V[]);
     setPurchases((p.data ?? []) as unknown as P[]);
+    setVisits((ck.data ?? []) as unknown as Visit[]);
     setLoading(false);
   }, []);
 
@@ -63,6 +74,14 @@ export default function Achats() {
       load();
     }, [load]),
   );
+
+  async function answerVisit(id: string, bought: boolean) {
+    setError('');
+    const { error } = await supabase.rpc('client_answer_checkin', { p_id: id, p_bought: bought });
+    if (error) return setError(errorMessage(error));
+    if (bought) Alert.alert(t('Merci'), t('Souki Deals va vérifier ce commerce.'));
+    await load();
+  }
 
   if (loading) return <ActivityIndicator style={{ marginTop: 40 }} color={colors.prune} />;
 
@@ -92,6 +111,23 @@ export default function Achats() {
         <Text style={{ fontSize: 15, color: colors.text }}>{t('Vous avez économisé environ')}</Text>
         <Text style={{ fontSize: 28, fontWeight: '900', color: colors.prune }}>{euros(saved)}</Text>
       </View>
+
+      {visits.map((c) => (
+        <View key={c.id} style={[styles.card, { borderColor: colors.saffron, borderWidth: 2 }]}>
+          <Text style={{ fontSize: 17, fontWeight: '800', color: colors.text }}>
+            {t('Avez-vous acheté chez {shop} le {date} ?', { shop: c.shops?.name ?? '', date: shortDate(c.created_at) })}
+          </Text>
+          <Muted>{t('Vous avez scanné le QR code du magasin, mais aucun montant n’a été saisi.')}</Muted>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Button title={t('Oui, j’ai acheté')} onPress={() => answerVisit(c.id, true)} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button title={t('Non')} variant="secondary" onPress={() => answerVisit(c.id, false)} />
+            </View>
+          </View>
+        </View>
+      ))}
 
       {purchases
         .filter((p) => p.status === 'pending')

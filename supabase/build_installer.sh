@@ -27,3 +27,11 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
   echo
   echo "commit;"
 } > "$HERE/MISE_A_JOUR_006_RELEVE.sql"
+
+{
+  echo "begin;"
+  echo "-- SOUKI DEALS : mise a jour 007 (scan inverse : QR code du magasin). N'efface rien, relancable."
+  cat "$HERE/migrations/007_scan_inverse.sql"
+  echo
+  echo "commit;"
+} > "$HERE/MISE_A_JOUR_007_SCAN.sql"

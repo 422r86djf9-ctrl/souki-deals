@@ -7,7 +7,8 @@ import { t, zoneLabel } from '../src/lib/i18n';
 import { errorMessage, supabase, whoami } from '../src/lib/supabase';
 import { Button, Chip, colors, ErrorText, Field, InfoText, Muted, SectionTitle, styles } from '../src/lib/theme';
 
-type Tab = 'summary' | 'shops' | 'disputes' | 'charges' | 'invoices' | 'reports' | 'settings';
+type Tab = 'summary' | 'shops' | 'scores' | 'disputes' | 'charges' | 'invoices' | 'reports' | 'settings';
+type Score = { shop_id: string; name: string; visits: number; done: number; without_amount: number; claimed: number; vouchers: number; vouchers_used: number; done_rate: number | null; level: 'ok' | 'orange' | 'rouge' };
 type Summary = Record<string, number> & { company_ready?: boolean };
 type Company = {
   legal_name: string | null;
@@ -101,6 +102,7 @@ export default function Admin() {
   const [zones, setZones] = useState<Zone[]>([]);
   const [form, setForm] = useState<Record<SKey, string> | null>(null);
   const [invoices, setInvoices] = useState<AdminInvoice[]>([]);
+  const [scores, setScores] = useState<Score[]>([]);
   const [company, setCompany] = useState<Record<CKey, string> | null>(null);
 
   const load = useCallback(async () => {
@@ -111,7 +113,7 @@ export default function Admin() {
         router.back();
         return;
       }
-      const [s, sh, d, c, r, z, st, inv, co] = await Promise.all([
+      const [s, sh, d, c, r, z, st, inv, co, sc] = await Promise.all([
         supabase.rpc('admin_summary'),
         supabase
           .from('shops')
@@ -129,6 +131,7 @@ export default function Admin() {
           .order('seq', { ascending: false })
           .limit(100),
         supabase.from('company').select('*').eq('id', 1).maybeSingle(),
+        supabase.rpc('admin_shop_scores'),
       ]);
       if (s.error) throw s.error;
       setSummary(s.data as Summary);
@@ -151,6 +154,7 @@ export default function Admin() {
         setForm((prev) => prev ?? f);
       }
       setInvoices((inv.data ?? []) as AdminInvoice[]);
+      setScores((sc.data ?? []) as Score[]);
       if (co.data) {
         const f = {} as Record<CKey, string>;
         for (const k of COMPANY_FIELDS) {
@@ -261,6 +265,7 @@ export default function Admin() {
   const pendingShops = shops.filter((s) => s.status === 'pending').length;
   const invoiceByCharge: Record<string, AdminInvoice> = {};
   for (const i of invoices) if (i.charge_id) invoiceByCharge[i.charge_id] = i;
+  const suspicious = scores.filter((x) => x.level !== 'ok').length;
   const invoiceAlerts = (summary?.invoices_missing ?? 0) + (summary?.invoices_failed ?? 0);
 
   return (
@@ -282,6 +287,7 @@ export default function Admin() {
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
         <Chip label={t('Résumé')} selected={tab === 'summary'} onPress={() => setTab('summary')} />
         <Chip label={pendingShops ? t('Commerces ({n} à valider)', { n: pendingShops }) : t('Commerces')} selected={tab === 'shops'} onPress={() => setTab('shops')} />
+        <Chip label={suspicious ? t('Méfiance ({n})', { n: suspicious }) : t('Méfiance')} selected={tab === 'scores'} onPress={() => setTab('scores')} />
         <Chip label={t('Contestations ({n})', { n: disputes.length })} selected={tab === 'disputes'} onPress={() => setTab('disputes')} />
         <Chip label={t('Prélèvements')} selected={tab === 'charges'} onPress={() => setTab('charges')} />
         <Chip label={invoiceAlerts ? t('Factures ({n} à traiter)', { n: invoiceAlerts }) : t('Factures')} selected={tab === 'invoices'} onPress={() => setTab('invoices')} />
@@ -364,6 +370,36 @@ export default function Admin() {
               </View>
             );
           })}
+        </View>
+      ) : null}
+
+      {tab === 'scores' ? (
+        <View>
+          <Muted>{t('90 derniers jours. Rouge : au moins 3 clients disent avoir acheté sans montant saisi, ou moins de 40 % des visites enregistrées. Orange : au moins 1 client, ou moins de 60 %. Passez vérifier sur place (client mystère).')}</Muted>
+          <View style={{ height: 8 }} />
+          {scores.length === 0 ? <Muted>{t('Aucun commerce validé.')}</Muted> : null}
+          {scores.map((x) => (
+            <View
+              key={x.shop_id}
+              style={[styles.card, x.level !== 'ok' && { borderWidth: 2, borderColor: x.level === 'rouge' ? colors.danger : colors.saffron }]}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text, flex: 1 }}>{x.name}</Text>
+                <Text style={{ fontWeight: '900', color: x.level === 'rouge' ? colors.danger : x.level === 'orange' ? colors.saffronDark : colors.success }}>
+                  {x.level === 'rouge' ? t('Rouge') : x.level === 'orange' ? t('Orange') : t('OK')}
+                </Text>
+              </View>
+              <Muted>
+                {t('{v} visites · {d} achats saisis ({r}) · {w} sans montant', {
+                  v: x.visits,
+                  d: x.done,
+                  r: x.done_rate == null ? '–' : `${x.done_rate} %`,
+                  w: x.without_amount,
+                })}
+              </Muted>
+              <Muted>{t('{c} client(s) disent avoir acheté sans saisie · bons : {u}/{b} utilisés', { c: x.claimed, u: x.vouchers_used, b: x.vouchers })}</Muted>
+            </View>
+          ))}
         </View>
       ) : null}
 

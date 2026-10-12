@@ -145,3 +145,10 @@ export function fullDate(iso: string): string {
   const d = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T12:00:00`) : new Date(iso);
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
+
+// QR code fixe d'un magasin : « SOUKIDEALS:SHOP:ABCD2345 »
+export const shopQrValue = (code: string) => `SOUKIDEALS:SHOP:${code}`;
+export function shopCodeFromScan(data: string): string | null {
+  const m = data.toUpperCase().match(/SOUKIDEALS:SHOP:([A-Z2-9]{8})\s*$/);
+  return m ? m[1] : null;
+}
