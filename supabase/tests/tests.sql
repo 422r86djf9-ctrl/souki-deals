@@ -357,6 +357,48 @@ select t.ok((select number like '%-000003' and amount_ht_cents = 300 and vat_cen
             'Sans TVA (franchise) : HT = TTC');
 select t.ok((select seller->>'vat_number' = 'FR12987654321' from invoices where id = :'inv1id'), 'Les anciennes factures gardent les infos du jour d''émission');
 
+-- ---------- Conditions et relevé annuel ----------
+select t.login(:'m1');
+select t.ok((select terms_version = current_terms_version() and terms_accepted_at is not null and terms_commission_rate = 5 and terms_discount_min = 5
+             from shops where id = :'m1shop'), 'Inscription : version, date et taux des conditions enregistrés par le serveur');
+update shops set terms_version = 'faux', terms_accepted_at = '2000-01-01', terms_commission_rate = 0 where id = :'m1shop';
+select t.ok((select terms_version = current_terms_version() and terms_commission_rate = 5 from shops where id = :'m1shop'),
+            'Le commerçant ne modifie pas ses conditions à la main');
+reset role;
+select set_config('souki.accept_terms', 'on', false);
+update shops set terms_version = '2026-10-11' where id = :'m1shop';
+select set_config('souki.accept_terms', '', false);
+select t.ok((select terms_version = '2026-10-11' from shops where id = :'m1shop'), 'Ancienne version (simulée)');
+set role authenticated;
+select t.login(:'m1');
+select merchant_accept_terms();
+select t.ok((select terms_version = current_terms_version() from shops where id = :'m1shop'), 'Le commerçant accepte la nouvelle version');
+select merchant_year_statement(extract(year from now() at time zone 'Europe/Paris')::int) as st1 \gset
+select t.ok((:'st1'::jsonb->>'year')::int = extract(year from now() at time zone 'Europe/Paris')::int
+            and :'st1'::jsonb->'shop'->>'siret' = '12345678901234'
+            and :'st1'::jsonb->'seller'->>'legal_name' = 'Souki Deals', 'Relevé : commerce et société');
+select t.ok(jsonb_array_length(:'st1'::jsonb->'invoices') = 2
+            and (select sum((x->>'amount_ttc_cents')::int) from jsonb_array_elements(:'st1'::jsonb->'invoices') x) = 500
+            and (select sum((x->>'vat_cents')::int) from jsonb_array_elements(:'st1'::jsonb->'invoices') x) = 33,
+            'Relevé : les 2 factures du commerce (5,00 € TTC dont 0,33 € de TVA)');
+select t.ok(jsonb_array_length(:'st1'::jsonb->'months') = 12
+            and (select sum((x->>'ttc_cents')::int) from jsonb_array_elements(:'st1'::jsonb->'months') x) = 500,
+            'Relevé : 12 mois, total des mois = total des factures');
+select t.ok(not exists (select 1 from jsonb_array_elements(:'st1'::jsonb->'purchases') x where x->>'status' = 'cancelled')
+            and (select bool_and((x->>'discount_cents')::int >= 0) from jsonb_array_elements(:'st1'::jsonb->'purchases') x),
+            'Relevé : achats sans les annulés, remise calculée');
+select t.ok((select (x->>'discount_cents')::int from jsonb_array_elements(:'st1'::jsonb->'purchases') x where (x->>'amount_cents')::int = 1900 limit 1) = 100,
+            'Remise : 19,00 € payés avec 5 % = 1,00 € de remise');
+select t.ok((select x->>'invoice' from jsonb_array_elements(:'st1'::jsonb->'purchases') x where (x->>'amount_cents')::int = 4000) = :'inv1',
+            'Chaque achat facturé indique son n° de facture');
+select t.throws($$select merchant_year_statement(1990)$$, 'BAD_YEAR', 'Année invalide refusée');
+select t.login(:'m2');
+select t.ok(jsonb_array_length(merchant_year_statement(extract(year from now() at time zone 'Europe/Paris')::int)->'invoices') = 1,
+            'Chaque commerçant ne voit que son relevé');
+select t.login(:'c1');
+select t.throws($$select merchant_year_statement(2026)$$, 'NO_SHOP', 'Un client n''a pas de relevé');
+select t.throws($$select merchant_accept_terms()$$, 'NO_SHOP', 'Un client n''accepte pas de conditions commerçant');
+
 -- ---------- Limites ----------
 select t.login(:'admin');
 select admin_update_settings(5, 5, 24, 1, 120, 50000, 24, 150, 3);

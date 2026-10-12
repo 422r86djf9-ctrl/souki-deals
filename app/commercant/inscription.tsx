@@ -1,9 +1,10 @@
 // Inscrire (ou modifier) son commerce
 import { Stack, router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { MapPicker } from '../../src/components/MapPicker';
 import { Kind, KINDS, kindLabel, Zone } from '../../src/lib/deals';
+import { shareConditionsPdf } from '../../src/lib/releve';
 import { t, zoneLabel } from '../../src/lib/i18n';
 import { errorMessage, PHONE_RE, supabase } from '../../src/lib/supabase';
 import { Button, Chip, colors, ErrorText, Field, Muted, styles } from '../../src/lib/theme';
@@ -17,6 +18,7 @@ export default function Inscription() {
   const [minDiscount, setMinDiscount] = useState(5);
   const [commission, setCommission] = useState(5);
   const [freeMonths, setFreeMonths] = useState(3);
+  const [launchSlots, setLaunchSlots] = useState(150);
   const [slotsLeft, setSlotsLeft] = useState<number | null>(null);
   const [accepted, setAccepted] = useState(false);
 
@@ -38,7 +40,7 @@ export default function Inscription() {
         const { data: u } = await supabase.auth.getUser();
         const [z, st, slots, mine] = await Promise.all([
           supabase.from('zones').select('id, name, name_en, name_ar, open, sort').order('sort'),
-          supabase.from('settings').select('discount_min, commission_rate, launch_free_months').eq('id', 1).single(),
+          supabase.from('settings').select('discount_min, commission_rate, launch_free_months, launch_slots').eq('id', 1).single(),
           supabase.rpc('launch_slots_left'),
           supabase
             .from('shops')
@@ -51,6 +53,7 @@ export default function Inscription() {
           setMinDiscount(Number(st.data.discount_min));
           setCommission(Number(st.data.commission_rate));
           setFreeMonths(Number(st.data.launch_free_months));
+          setLaunchSlots(Number(st.data.launch_slots));
         }
         setSlotsLeft(typeof slots.data === 'number' ? slots.data : null);
         const s = mine.data;
@@ -171,6 +174,19 @@ export default function Inscription() {
         <Field label={t('Horaires (facultatif)')} value={hours} onChangeText={setHours} maxLength={200} placeholder={t('Lun-Sam 8h-20h')} />
         <Field label={t('Présentation (facultatif)')} value={description} onChangeText={setDescription} maxLength={400} multiline />
 
+        {!shopId ? (
+          <Pressable
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={() =>
+              shareConditionsPdf({ discountMin: minDiscount, commission, launchSlots, launchMonths: freeMonths }).catch(() =>
+                setError(t('Impossible de préparer le fichier.')),
+              )
+            }
+          >
+            <Text style={{ color: colors.prune, fontWeight: '700', marginBottom: 8 }}>{t('Lire les conditions complètes (PDF)')}</Text>
+          </Pressable>
+        ) : null}
         {!shopId ? (
           <View style={[styles.card, { flexDirection: 'row', alignItems: 'center' }]}>
             <Text style={{ flex: 1, color: colors.text }}>

@@ -2,6 +2,7 @@
 import { Stack, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { TERMS_VERSION } from '../../src/lib/conditions';
 import { euros, fullDate, Invoice, invoiceEmailLabel, shortDate, timeLabel } from '../../src/lib/deals';
 import { t } from '../../src/lib/i18n';
 import { errorMessage, supabase } from '../../src/lib/supabase';
@@ -49,6 +50,7 @@ export default function Commercant() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [charges, setCharges] = useState<Charge[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [termsOutdated, setTermsOutdated] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -60,7 +62,7 @@ export default function Commercant() {
       router.replace('/commercant/inscription');
       return;
     }
-    const [s, p, c, f] = await Promise.all([
+    const [s, p, c, f, tv] = await Promise.all([
       supabase.rpc('merchant_stats'),
       supabase.from('purchases').select('id, amount_cents, commission_cents, free, status, created_at').eq('shop_id', shop).order('created_at', { ascending: false }).limit(30),
       supabase.from('charges').select('id, week_start, amount_cents, status').eq('shop_id', shop).order('week_start', { ascending: false }).limit(12),
@@ -70,12 +72,15 @@ export default function Commercant() {
         .eq('shop_id', shop)
         .order('seq', { ascending: false })
         .limit(24),
+      supabase.from('shops').select('terms_version').eq('id', shop).maybeSingle(),
     ]);
     if (s.error) setError(errorMessage(s.error));
     else setStats(s.data as Stats);
     setPurchases((p.data ?? []) as Purchase[]);
     setCharges((c.data ?? []) as Charge[]);
     setInvoices((f.data ?? []) as Invoice[]);
+    const v = (tv.data as { terms_version?: string | null } | null)?.terms_version;
+    setTermsOutdated(!!v && v !== TERMS_VERSION);
   }, []);
 
   // PDF de la facture : lien privé valable 10 minutes
@@ -141,6 +146,14 @@ export default function Commercant() {
             <Text style={{ color: colors.danger, fontWeight: '700', marginBottom: 8 }}>
               {t('Commerce masqué aux clients : un prélèvement de commission n’a pas abouti.')}
             </Text>
+          ) : null}
+          {termsOutdated ? (
+            <Pressable onPress={() => router.push('/commercant/releve')} accessibilityRole="button">
+              <View style={[styles.card, { backgroundColor: colors.saffronSoft, borderColor: colors.saffronSoft }]}>
+                <Text style={{ fontWeight: '800', color: colors.text }}>{t('Nouvelle version des conditions')}</Text>
+                <Muted>{t('Touchez ici pour la lire et l’accepter.')}</Muted>
+              </View>
+            </Pressable>
           ) : null}
           {free ? (
             <View style={[styles.card, { backgroundColor: colors.pruneSoft, borderColor: colors.pruneSoft }]}>
@@ -208,6 +221,7 @@ export default function Commercant() {
           <SectionTitle>{t('Mes factures')}</SectionTitle>
           <Muted>{t('Une facture est créée à chaque commission payée et envoyée sur l’adresse e-mail de votre compte.')}</Muted>
           <View style={{ height: 6 }} />
+          <Button title={t('Relevé annuel pour le comptable')} variant="secondary" onPress={() => router.push('/commercant/releve')} />
           {invoices.length === 0 ? <Muted>{t('Aucune facture pour le moment.')}</Muted> : null}
           {invoices.map((i) => (
             <View key={i.id} style={[styles.card, { paddingVertical: 10 }]}>

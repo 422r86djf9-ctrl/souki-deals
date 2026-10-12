@@ -48,7 +48,7 @@ begin
       'admin_resolve_purchase', 'admin_set_charge_status', 'admin_close_report', 'admin_set_zone_open',
       'admin_update_settings', 'guard_invoices', 'company_ready', 'send_invoice', 'issue_invoice',
       'charges_invoice_trigger', 'issue_missing_invoices', 'admin_save_company', 'admin_resend_invoice',
-      'merchant_resend_invoice')
+      'merchant_resend_invoice', 'current_terms_version', 'merchant_accept_terms', 'merchant_year_statement')
   loop
     execute format('drop function if exists %s cascade', r.sig);
   end loop;
