@@ -11,13 +11,25 @@ begin
   if exists (select 1 from information_schema.tables
              where table_schema = 'public'
                and table_name not in ('settings', 'zones', 'profiles', 'shops', 'products',
-                                      'vouchers', 'purchases', 'charges', 'reports')) then
+                                      'vouchers', 'purchases', 'charges', 'reports', 'company', 'invoices')) then
     raise exception 'SOUKI DEALS : ce projet Supabase contient d''autres tables. Installez Souki Deals dans un projet dédié.';
   end if;
 end $$;
 
+-- Les factures se conservent 10 ans : pas de remise à zéro une fois la première émise
+do $$
+declare v_n bigint := 0;
+begin
+  if to_regclass('public.invoices') is not null then
+    execute 'select count(*) from public.invoices' into v_n;
+  end if;
+  if v_n > 0 then
+    raise exception 'SOUKI DEALS : des factures ont été émises. Remise à zéro interdite : utilisez un fichier MISE_A_JOUR.';
+  end if;
+end $$;
+
 drop table if exists
-  public.reports, public.charges, public.purchases, public.vouchers,
+  public.invoices, public.company, public.reports, public.charges, public.purchases, public.vouchers,
   public.products, public.shops, public.profiles, public.zones, public.settings
 cascade;
 
@@ -34,7 +46,9 @@ begin
       'cancel_voucher', 'merchant_scan', 'client_answer_purchase', 'merchant_stats', 'report_create',
       'close_week', 'souki_deals_tick', 'admin_summary', 'admin_set_shop_status', 'admin_set_card_ok',
       'admin_resolve_purchase', 'admin_set_charge_status', 'admin_close_report', 'admin_set_zone_open',
-      'admin_update_settings')
+      'admin_update_settings', 'guard_invoices', 'company_ready', 'send_invoice', 'issue_invoice',
+      'charges_invoice_trigger', 'issue_missing_invoices', 'admin_save_company', 'admin_resend_invoice',
+      'merchant_resend_invoice')
   loop
     execute format('drop function if exists %s cascade', r.sig);
   end loop;

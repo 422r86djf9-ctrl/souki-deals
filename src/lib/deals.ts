@@ -118,3 +118,30 @@ export function timeLabel(iso: string): string {
   const d = new Date(iso);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
+
+// Factures des commissions
+export type Invoice = {
+  id: string;
+  number: string;
+  charge_id?: string | null;
+  issued_at: string;
+  period_start: string;
+  period_end: string;
+  amount_ttc_cents: number;
+  email_to: string | null;
+  email_status: 'pending' | 'sent' | 'failed';
+  email_error?: string | null;
+  pdf_path: string | null;
+  buyer?: { name?: string | null } | null;
+};
+
+export function invoiceEmailLabel(i: Invoice): string {
+  if (i.email_status === 'sent') return t('Envoyée à {email}', { email: i.email_to ?? '' });
+  if (i.email_status === 'failed') return t('Envoi par e-mail impossible');
+  return t('Envoi par e-mail en cours');
+}
+
+export function fullDate(iso: string): string {
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T12:00:00`) : new Date(iso);
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+}

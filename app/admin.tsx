@@ -2,13 +2,38 @@
 import { Stack, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
-import { euros, kindLabel, shortDate, Zone } from '../src/lib/deals';
+import { euros, fullDate, Invoice, invoiceEmailLabel, kindLabel, shortDate, Zone } from '../src/lib/deals';
 import { t, zoneLabel } from '../src/lib/i18n';
 import { errorMessage, supabase, whoami } from '../src/lib/supabase';
 import { Button, Chip, colors, ErrorText, Field, InfoText, Muted, SectionTitle, styles } from '../src/lib/theme';
 
-type Tab = 'summary' | 'shops' | 'disputes' | 'charges' | 'reports' | 'settings';
-type Summary = Record<string, number>;
+type Tab = 'summary' | 'shops' | 'disputes' | 'charges' | 'invoices' | 'reports' | 'settings';
+type Summary = Record<string, number> & { company_ready?: boolean };
+type Company = {
+  legal_name: string | null;
+  legal_form: string | null;
+  capital: string | null;
+  address: string | null;
+  siret: string | null;
+  rcs: string | null;
+  vat_number: string | null;
+  email: string | null;
+  vat_rate: number;
+  invoice_prefix: string;
+};
+type CKey = keyof Company;
+const COMPANY_FIELDS: { key: CKey; label: string; placeholder?: string }[] = [
+  { key: 'legal_name', label: 'Raison sociale', placeholder: 'Souki Deals' },
+  { key: 'legal_form', label: 'Forme juridique', placeholder: 'SAS, SASU, EURL, micro-entreprise…' },
+  { key: 'capital', label: 'Capital social', placeholder: '1 000 €' },
+  { key: 'address', label: 'Adresse du siège' },
+  { key: 'siret', label: 'SIRET (14 chiffres)' },
+  { key: 'rcs', label: 'RCS', placeholder: 'RCS Paris 123 456 789' },
+  { key: 'vat_number', label: 'N° de TVA intracommunautaire', placeholder: 'FR12345678901' },
+  { key: 'email', label: 'E-mail de réponse aux factures' },
+  { key: 'vat_rate', label: 'TVA comprise dans la commission (%) — 0 si franchise' },
+  { key: 'invoice_prefix', label: 'Préfixe des numéros de facture' },
+];
 type ShopRow = {
   id: string;
   owner_id: string;
@@ -28,6 +53,7 @@ type ShopRow = {
 };
 type Dispute = { id: string; amount_cents: number; dispute_reason: string | null; created_at: string; shops: { name: string } | null };
 type ChargeRow = { id: string; week_start: string; amount_cents: number; status: 'pending' | 'paid' | 'failed' | 'waived'; shops: { name: string } | null };
+type AdminInvoice = Invoice & { charge_id: string | null };
 type ReportRow = { id: number; kind: string; body: string; created_at: string; shops: { name: string } | null };
 type Settings = {
   discount_min: number;
@@ -74,6 +100,8 @@ export default function Admin() {
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
   const [form, setForm] = useState<Record<SKey, string> | null>(null);
+  const [invoices, setInvoices] = useState<AdminInvoice[]>([]);
+  const [company, setCompany] = useState<Record<CKey, string> | null>(null);
 
   const load = useCallback(async () => {
     setError('');
@@ -83,7 +111,7 @@ export default function Admin() {
         router.back();
         return;
       }
-      const [s, sh, d, c, r, z, st] = await Promise.all([
+      const [s, sh, d, c, r, z, st, inv, co] = await Promise.all([
         supabase.rpc('admin_summary'),
         supabase
           .from('shops')
@@ -95,6 +123,12 @@ export default function Admin() {
         supabase.from('reports').select('id, kind, body, created_at, shops(name)').eq('status', 'open').order('created_at'),
         supabase.from('zones').select('id, name, name_en, name_ar, open, sort').order('sort'),
         supabase.from('settings').select('*').eq('id', 1).single(),
+        supabase
+          .from('invoices')
+          .select('id, number, charge_id, issued_at, period_start, period_end, amount_ttc_cents, email_to, email_status, email_error, pdf_path, buyer')
+          .order('seq', { ascending: false })
+          .limit(100),
+        supabase.from('company').select('*').eq('id', 1).maybeSingle(),
       ]);
       if (s.error) throw s.error;
       setSummary(s.data as Summary);
@@ -115,6 +149,15 @@ export default function Admin() {
         const f = {} as Record<SKey, string>;
         for (const k of FIELDS) f[k.key] = String((st.data as Settings)[k.key]).replace('.', ',');
         setForm((prev) => prev ?? f);
+      }
+      setInvoices((inv.data ?? []) as AdminInvoice[]);
+      if (co.data) {
+        const f = {} as Record<CKey, string>;
+        for (const k of COMPANY_FIELDS) {
+          const v = (co.data as Company)[k.key];
+          f[k.key] = v == null ? '' : String(v).replace('.', ',');
+        }
+        setCompany((prev) => prev ?? f);
       }
     } catch (e) {
       setError(errorMessage(e));
@@ -176,9 +219,49 @@ export default function Admin() {
     });
   }
 
+  async function saveCompany() {
+    if (!company) return;
+    const rate = Number(company.vat_rate.replace(',', '.'));
+    if (company.vat_rate.trim() === '' || !Number.isFinite(rate) || rate < 0 || rate > 30) return setError(t('Taux de TVA invalide.'));
+    confirm(t('Enregistrer les informations de la société ?'), t('Elles figureront sur les prochaines factures. Les factures déjà émises ne changent pas.'), async () => {
+      setBusy(true);
+      setError('');
+      setInfo('');
+      const { data, error } = await supabase.rpc('admin_save_company', {
+        p_legal_name: company.legal_name,
+        p_legal_form: company.legal_form,
+        p_capital: company.capital,
+        p_address: company.address,
+        p_siret: company.siret,
+        p_rcs: company.rcs,
+        p_vat_number: company.vat_number,
+        p_email: company.email,
+        p_vat_rate: rate,
+        p_invoice_prefix: company.invoice_prefix,
+      });
+      setBusy(false);
+      if (error) return setError(errorMessage(error));
+      const issued = Number((data as { issued?: number } | null)?.issued ?? 0);
+      setInfo(issued > 0 ? t('Informations enregistrées. {n} facture(s) en attente créée(s) et envoyée(s).', { n: issued }) : t('Informations enregistrées.'));
+      setCompany(null);
+      await load();
+    });
+  }
+
+  async function openInvoice(i: Invoice) {
+    setError('');
+    if (!i.pdf_path) return setInfo(t('Le PDF de cette facture est en préparation. Réessayez dans quelques minutes.'));
+    const { data, error } = await supabase.storage.from('factures').createSignedUrl(i.pdf_path, 600);
+    if (error || !data?.signedUrl) return setError(t('Impossible d’ouvrir la facture.'));
+    Linking.openURL(data.signedUrl);
+  }
+
   if (loading) return <ActivityIndicator style={{ marginTop: 40 }} color={colors.prune} />;
 
   const pendingShops = shops.filter((s) => s.status === 'pending').length;
+  const invoiceByCharge: Record<string, AdminInvoice> = {};
+  for (const i of invoices) if (i.charge_id) invoiceByCharge[i.charge_id] = i;
+  const invoiceAlerts = (summary?.invoices_missing ?? 0) + (summary?.invoices_failed ?? 0);
 
   return (
     <ScrollView
@@ -201,6 +284,7 @@ export default function Admin() {
         <Chip label={pendingShops ? t('Commerces ({n} à valider)', { n: pendingShops }) : t('Commerces')} selected={tab === 'shops'} onPress={() => setTab('shops')} />
         <Chip label={t('Contestations ({n})', { n: disputes.length })} selected={tab === 'disputes'} onPress={() => setTab('disputes')} />
         <Chip label={t('Prélèvements')} selected={tab === 'charges'} onPress={() => setTab('charges')} />
+        <Chip label={invoiceAlerts ? t('Factures ({n} à traiter)', { n: invoiceAlerts }) : t('Factures')} selected={tab === 'invoices'} onPress={() => setTab('invoices')} />
         <Chip label={t('Signalements ({n})', { n: reports.length })} selected={tab === 'reports'} onPress={() => setTab('reports')} />
         <Chip label={t('Réglages')} selected={tab === 'settings'} onPress={() => setTab('settings')} />
       </View>
@@ -223,6 +307,9 @@ export default function Admin() {
             [t('Bons en cours'), String(summary.vouchers_active)],
             [t('Utilisateurs'), String(summary.users_count)],
             [t('À prélever ou refusé'), euros(summary.charges_pending_cents)],
+            [t('Factures émises ce mois-ci'), String(summary.invoices_month ?? 0)],
+            [t('Paiements sans facture'), String(summary.invoices_missing ?? 0)],
+            [t('Factures non envoyées'), String(summary.invoices_failed ?? 0)],
           ].map(([label, value]) => (
             <View key={label} style={[styles.card, { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12 }]}>
               <Text style={{ color: colors.text, flex: 1 }}>{label}</Text>
@@ -309,10 +396,70 @@ export default function Admin() {
               <Muted>{`${t('Semaine du {date}', { date: shortDate(c.week_start) })} · ${
                 c.status === 'paid' ? t('Payé') : c.status === 'failed' ? t('Refusé') : c.status === 'waived' ? t('Offert') : t('À prélever')
               }`}</Muted>
+              {invoiceByCharge[c.id] ? (
+                <Text style={{ color: colors.success, fontWeight: '700', marginTop: 6 }}>
+                  {t('Facturé : {number}', { number: invoiceByCharge[c.id].number })}
+                </Text>
+              ) : (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 }}>
                 <Chip label={t('Payé')} selected={c.status === 'paid'} onPress={() => rpc('admin_set_charge_status', { p_id: c.id, p_status: 'paid' })} />
                 <Chip label={t('Refusé')} selected={c.status === 'failed'} onPress={() => rpc('admin_set_charge_status', { p_id: c.id, p_status: 'failed' })} />
                 <Chip label={t('Offert')} selected={c.status === 'waived'} onPress={() => rpc('admin_set_charge_status', { p_id: c.id, p_status: 'waived' })} />
+              </View>
+              )}
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {tab === 'invoices' ? (
+        <View>
+          {!summary?.company_ready ? (
+            <View style={[styles.card, { backgroundColor: colors.saffronSoft, borderColor: colors.saffronSoft }]}>
+              <Text style={{ fontWeight: '800', color: colors.text }}>{t('Remplissez les informations de la société')}</Text>
+              <Muted>{t('Sans raison sociale, adresse et SIRET, aucune facture ne peut être émise. Les paiements déjà reçus seront facturés dès l’enregistrement.')}</Muted>
+            </View>
+          ) : null}
+          {(summary?.invoices_missing ?? 0) > 0 ? (
+            <Text style={{ color: colors.danger, fontWeight: '700', marginBottom: 6 }}>
+              {t('{n} paiement(s) en attente de facture.', { n: summary?.invoices_missing ?? 0 })}
+            </Text>
+          ) : null}
+          <SectionTitle>{t('Société qui facture')}</SectionTitle>
+          {company
+            ? COMPANY_FIELDS.map((f) => (
+                <Field
+                  key={f.key}
+                  label={t(f.label)}
+                  value={company[f.key]}
+                  placeholder={f.placeholder ? t(f.placeholder) : undefined}
+                  onChangeText={(v) => setCompany({ ...company, [f.key]: f.key === 'vat_rate' ? v.replace(/[^0-9.,]/g, '') : v })}
+                  keyboardType={f.key === 'vat_rate' ? 'decimal-pad' : f.key === 'siret' ? 'number-pad' : f.key === 'email' ? 'email-address' : 'default'}
+                  autoCapitalize={f.key === 'email' ? 'none' : f.key === 'vat_number' || f.key === 'invoice_prefix' ? 'characters' : 'sentences'}
+                  maxLength={f.key === 'address' ? 200 : 80}
+                />
+              ))
+            : null}
+          <Button title={t('Enregistrer la société')} onPress={saveCompany} loading={busy} />
+
+          <SectionTitle>{t('Factures émises')}</SectionTitle>
+          {invoices.length === 0 ? <Muted>{t('Aucune facture pour le moment.')}</Muted> : null}
+          {invoices.map((i) => (
+            <View key={i.id} style={styles.card}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text, flex: 1 }}>{`${i.number} · ${i.buyer?.name ?? ''}`}</Text>
+                <Text style={{ fontWeight: '900', color: colors.prune }}>{euros(i.amount_ttc_cents)}</Text>
+              </View>
+              <Muted>{t('Du {start} au {end} · émise le {date}', { start: shortDate(i.period_start), end: shortDate(i.period_end), date: fullDate(i.issued_at) })}</Muted>
+              <Text style={{ color: i.email_status === 'failed' ? colors.danger : colors.muted, fontSize: 13 }}>{invoiceEmailLabel(i)}</Text>
+              {i.email_status !== 'sent' && i.email_error ? <Muted>{i.email_error}</Muted> : null}
+              <View style={{ flexDirection: 'row', gap: 16, marginTop: 6 }}>
+                <Pressable onPress={() => openInvoice(i)} accessibilityRole="button" hitSlop={8}>
+                  <Text style={{ color: colors.prune, fontWeight: '700' }}>{t('Voir le PDF')}</Text>
+                </Pressable>
+                <Pressable onPress={() => rpc('admin_resend_invoice', { p_id: i.id })} accessibilityRole="button" hitSlop={8}>
+                  <Text style={{ color: colors.prune, fontWeight: '700' }}>{t('Renvoyer par e-mail')}</Text>
+                </Pressable>
               </View>
             </View>
           ))}

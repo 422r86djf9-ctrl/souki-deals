@@ -1,11 +1,11 @@
 // Espace commerçant : compte du jour et de la semaine, scanner, produits
 import { Stack, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from 'react-native';
-import { euros, shortDate, timeLabel } from '../../src/lib/deals';
+import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { euros, fullDate, Invoice, invoiceEmailLabel, shortDate, timeLabel } from '../../src/lib/deals';
 import { t } from '../../src/lib/i18n';
 import { errorMessage, supabase } from '../../src/lib/supabase';
-import { Button, colors, ErrorText, Muted, SectionTitle, styles } from '../../src/lib/theme';
+import { Button, colors, ErrorText, InfoText, Muted, SectionTitle, styles } from '../../src/lib/theme';
 
 type Stats = {
   today_cents: number;
@@ -48,7 +48,9 @@ export default function Commercant() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [charges, setCharges] = useState<Charge[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
@@ -58,16 +60,42 @@ export default function Commercant() {
       router.replace('/commercant/inscription');
       return;
     }
-    const [s, p, c] = await Promise.all([
+    const [s, p, c, f] = await Promise.all([
       supabase.rpc('merchant_stats'),
       supabase.from('purchases').select('id, amount_cents, commission_cents, free, status, created_at').eq('shop_id', shop).order('created_at', { ascending: false }).limit(30),
       supabase.from('charges').select('id, week_start, amount_cents, status').eq('shop_id', shop).order('week_start', { ascending: false }).limit(12),
+      supabase
+        .from('invoices')
+        .select('id, number, issued_at, period_start, period_end, amount_ttc_cents, email_to, email_status, pdf_path')
+        .eq('shop_id', shop)
+        .order('seq', { ascending: false })
+        .limit(24),
     ]);
     if (s.error) setError(errorMessage(s.error));
     else setStats(s.data as Stats);
     setPurchases((p.data ?? []) as Purchase[]);
     setCharges((c.data ?? []) as Charge[]);
+    setInvoices((f.data ?? []) as Invoice[]);
   }, []);
+
+  // PDF de la facture : lien privé valable 10 minutes
+  async function openInvoice(i: Invoice) {
+    setError('');
+    setInfo('');
+    if (!i.pdf_path) return setInfo(t('Le PDF de cette facture est en préparation. Réessayez dans quelques minutes.'));
+    const { data, error } = await supabase.storage.from('factures').createSignedUrl(i.pdf_path, 600);
+    if (error || !data?.signedUrl) return setError(t('Impossible d’ouvrir la facture.'));
+    Linking.openURL(data.signedUrl);
+  }
+
+  async function resendInvoice(i: Invoice) {
+    setError('');
+    setInfo('');
+    const { error } = await supabase.rpc('merchant_resend_invoice', { p_id: i.id });
+    if (error) return setError(errorMessage(error));
+    setInfo(t('Facture {number} renvoyée sur votre adresse e-mail.', { number: i.number }));
+    await load();
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -96,6 +124,7 @@ export default function Commercant() {
     >
       <Stack.Screen options={{ title: t('Mon commerce') }} />
       <ErrorText>{error}</ErrorText>
+      <InfoText>{info}</InfoText>
       {stats ? (
         <>
           {stats.status === 'pending' ? (
@@ -175,6 +204,29 @@ export default function Commercant() {
               ))}
             </>
           ) : null}
+
+          <SectionTitle>{t('Mes factures')}</SectionTitle>
+          <Muted>{t('Une facture est créée à chaque commission payée et envoyée sur l’adresse e-mail de votre compte.')}</Muted>
+          <View style={{ height: 6 }} />
+          {invoices.length === 0 ? <Muted>{t('Aucune facture pour le moment.')}</Muted> : null}
+          {invoices.map((i) => (
+            <View key={i.id} style={[styles.card, { paddingVertical: 10 }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontWeight: '800', color: colors.text }}>{i.number}</Text>
+                <Text style={{ fontWeight: '800', color: colors.prune }}>{euros(i.amount_ttc_cents)}</Text>
+              </View>
+              <Muted>{t('Du {start} au {end} · émise le {date}', { start: shortDate(i.period_start), end: shortDate(i.period_end), date: fullDate(i.issued_at) })}</Muted>
+              <Text style={{ color: i.email_status === 'failed' ? colors.danger : colors.muted, fontSize: 13 }}>{invoiceEmailLabel(i)}</Text>
+              <View style={{ flexDirection: 'row', gap: 16, marginTop: 6 }}>
+                <Pressable onPress={() => openInvoice(i)} accessibilityRole="button" hitSlop={8}>
+                  <Text style={{ color: colors.prune, fontWeight: '700' }}>{t('Voir le PDF')}</Text>
+                </Pressable>
+                <Pressable onPress={() => resendInvoice(i)} accessibilityRole="button" hitSlop={8}>
+                  <Text style={{ color: colors.prune, fontWeight: '700' }}>{t('Renvoyer par e-mail')}</Text>
+                </Pressable>
+              </View>
+            </View>
+          ))}
         </>
       ) : null}
     </ScrollView>

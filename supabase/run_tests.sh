@@ -17,3 +17,16 @@ PSQL=(psql -h "$WORK" -p "$PORT" -U postgres -d postgres -v ON_ERROR_STOP=1 -q -
 # Deuxième installation : vérifie que la remise à zéro fonctionne
 "${PSQL[@]}" -f "$HERE/INSTALLER_SOUKI_DEALS.sql" >/dev/null
 "${PSQL[@]}" -f "$HERE/tests/tests.sql"
+
+# Base remplie par les tests : la mise à jour se relance sans rien perdre
+BEFORE=$("${PSQL[@]}" -tA -c "select count(*) from public.invoices")
+"${PSQL[@]}" -f "$HERE/MISE_A_JOUR_005_FACTURES.sql" >/dev/null
+"${PSQL[@]}" -f "$HERE/MISE_A_JOUR_005_FACTURES.sql" >/dev/null
+AFTER=$("${PSQL[@]}" -tA -c "select count(*) from public.invoices")
+[ "$BEFORE" = "$AFTER" ] && [ "$AFTER" -gt 0 ] || { echo "ÉCHEC : la mise à jour a perdu des factures"; exit 1; }
+echo "Mise à jour 005 relancée deux fois : $AFTER factures conservées"
+# Factures émises : la remise à zéro doit être refusée
+if "${PSQL[@]}" -f "$HERE/INSTALLER_SOUKI_DEALS.sql" >/dev/null 2>&1; then
+  echo "ÉCHEC : remise à zéro acceptée alors que des factures existent"; exit 1
+fi
+echo "Remise à zéro refusée quand des factures existent : OK"

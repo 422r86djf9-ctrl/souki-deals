@@ -29,3 +29,12 @@ alter table storage.objects enable row level security;
 grant usage on schema storage to anon, authenticated;
 grant select, insert, update, delete on storage.objects to authenticated;
 grant execute on function storage.foldername(text) to anon, authenticated;
+
+-- Simulation de pg_net : les demandes d'envoi sont seulement notées
+create schema net;
+create table net.calls (id bigserial primary key, url text, body jsonb, created_at timestamptz default now());
+create function net.http_post(url text, body jsonb default '{}'::jsonb, params jsonb default '{}'::jsonb,
+                              headers jsonb default '{}'::jsonb, timeout_milliseconds int default 5000)
+returns bigint language sql as $$
+  insert into net.calls (url, body) values (url, body) returning id;
+$$;

@@ -275,6 +275,88 @@ select admin_set_charge_status(:'ch1', 'paid');
 select t.login(:'c1');
 select t.ok(exists (select 1 from nearby_shops(48.93, 2.35, 5) where id = :'m1shop'), 'Payé : commerce de nouveau visible');
 
+-- ---------- Factures des commissions ----------
+select t.login(:'admin');
+select t.ok((admin_summary()->>'invoices_missing')::int = 1 and not (admin_summary()->>'company_ready')::boolean,
+            'Prélèvement payé sans infos de la société : facture en attente');
+select t.ok((select count(*) from invoices) = 0, 'Aucune facture tant que la société n''est pas renseignée');
+select t.throws($$select admin_save_company('Souki Deals', 'SAS', null, '10 rue de la Paix, 75002 Paris', '123', null, null, null, 20, 'SD')$$,
+                'BAD_SIRET', 'SIRET de la société vérifié');
+select t.throws($$select admin_save_company('Souki Deals', 'SAS', null, '10 rue de la Paix, 75002 Paris', '98765432100012', null, null, null, 20, 'SD')$$,
+                'BAD_VAT', 'TVA à 20 % : numéro de TVA obligatoire');
+select t.login(:'m1');
+select t.throws($$select admin_save_company('Pirate', 'SAS', null, '10 rue de la Paix, 75002 Paris', '98765432100012', null, null, null, 0, 'SD')$$,
+                'NOT_ADMIN', 'Infos de la société réservées au fondateur');
+select t.ok((select count(*) from company) = 0, 'Un commerçant ne lit pas les infos de la société');
+select t.login(:'admin');
+select t.ok((admin_save_company('Souki Deals', 'SAS', '1 000 €', '10 rue de la Paix, 75002 Paris', '987 654 321 00012',
+             'RCS Paris 987 654 321', 'fr12987654321', 'factures@soukideals.fr', 20, 'SD')->>'issued')::int = 1,
+            'Infos de la société enregistrées : la facture en attente est créée');
+select id as inv1id, number as inv1 from invoices where charge_id = :'ch1' \gset
+select t.ok(:'inv1' = 'SD-' || to_char(now() at time zone 'Europe/Paris', 'YYYY') || '-000001', 'Première facture numérotée SD-année-000001');
+select t.ok((select amount_ttc_cents = 200 and amount_ht_cents = 167 and vat_cents = 33 and vat_rate = 20 from invoices where id = :'inv1id'),
+            'Commission TTC 2,00 € = 1,67 € HT + 0,33 € de TVA');
+select t.ok((select email_to = 'boucherie@test.fr' and email_status = 'pending' and email_attempts = 1
+                    and buyer->>'siret' = '12345678901234' and seller->>'vat_number' = 'FR12987654321' and seller->>'siret' = '98765432100012'
+                    and purchases_count = 1 and sales_cents = 4000 from invoices where id = :'inv1id'),
+            'Facture : e-mail du commerçant, SIRET, TVA, ventes de la période');
+select t.ok((admin_summary()->>'invoices_missing')::int = 0 and (admin_summary()->>'company_ready')::boolean, 'Plus de facture en attente');
+select t.throws(format($$select admin_set_charge_status(%L, 'failed')$$, :'ch1'), 'INVOICED', 'Prélèvement facturé : statut figé');
+-- Prélèvement payé : facture créée tout de suite, numéro suivant
+select id as ch2 from charges where shop_id = :'m2shop' \gset
+select admin_set_charge_status(:'ch2', 'paid');
+select t.ok((select number = 'SD-' || to_char(now() at time zone 'Europe/Paris', 'YYYY') || '-000002' and amount_ttc_cents = 50
+                    and amount_ht_cents = 42 and vat_cents = 8 and email_to = 'resto@test.fr' from invoices where charge_id = :'ch2'),
+            'Paiement marqué : facture n° 2 créée automatiquement');
+select id as inv2id from invoices where charge_id = :'ch2' \gset
+select t.throws($$select admin_save_company('Souki Deals', 'SAS', null, '10 rue de la Paix, 75002 Paris', '98765432100012', null, 'FR12987654321', null, 20, 'FAC')$$,
+                'INVOICE_LOCKED', 'Préfixe figé après la première facture');
+select t.fails(format($$update invoices set amount_ttc_cents = 1 where id = %L$$, :'inv1id'), 'Une facture ne se modifie pas depuis l''appli');
+-- Qui voit quoi
+select t.login(:'m1');
+select t.ok((select count(*) from invoices) = 1 and (select id from invoices) = :'inv1id', 'Le commerçant voit sa facture, pas celles des autres');
+select t.throws(format($$select merchant_resend_invoice(%L)$$, :'inv1id'), 'TOO_SOON', 'Renvoi limité : une fois toutes les 10 minutes');
+select t.throws(format($$select merchant_resend_invoice(%L)$$, :'inv2id'), 'NOT_FOUND', 'Pas de renvoi de la facture d''un autre');
+select t.login(:'c1');
+select t.ok((select count(*) from invoices) = 0, 'Un client ne voit aucune facture');
+reset role;
+-- Facture figée, même pour la base
+select t.throws(format($$update invoices set amount_ttc_cents = 1 where id = %L$$, :'inv1id'), 'INVOICE_LOCKED', 'Montant d''une facture figé');
+select t.throws(format($$delete from invoices where id = %L$$, :'inv1id'), 'INVOICE_LOCKED', 'Une facture ne se supprime pas');
+select t.ok((select count(*) from net.calls where body->>'invoice_id' in (:'inv1id', :'inv2id')) = 2, 'Envoi par e-mail demandé pour chaque facture');
+-- La fonction d'envoi marque la facture envoyée
+update invoices set email_status = 'sent', email_sent_at = now(), pdf_path = :'m1shop' || '/' || number || '.pdf' where id = :'inv1id';
+select t.ok((select email_status = 'sent' from invoices where id = :'inv1id'), 'Facture marquée envoyée par la fonction d''envoi');
+update invoices set email_last_try = now() - interval '1 hour' where id = :'inv1id';
+set role authenticated;
+select t.login(:'m1');
+select merchant_resend_invoice(:'inv1id');
+select t.ok((select email_status = 'pending' and email_attempts = 1 from invoices where id = :'inv1id'), 'Le commerçant redemande sa facture par e-mail');
+reset role;
+-- Tâche automatique : nouvel essai, puis échec après 5 essais
+update invoices set email_last_try = now() - interval '1 hour' where id = :'inv2id';
+select souki_deals_tick();
+select t.ok((select email_attempts = 2 from invoices where id = :'inv2id'), 'Nouvel essai d''envoi par la tâche automatique');
+update invoices set email_attempts = 5, email_last_try = now() - interval '1 hour' where id = :'inv2id';
+select souki_deals_tick();
+select t.ok((select email_status = 'failed' from invoices where id = :'inv2id'), 'Après 5 essais : envoi en échec, visible du fondateur');
+set role authenticated;
+select t.login(:'admin');
+select t.ok((admin_summary()->>'invoices_failed')::int = 1, 'Le fondateur voit l''échec d''envoi');
+select admin_resend_invoice(:'inv2id');
+select t.ok((select email_status = 'pending' and email_attempts = 1 from invoices where id = :'inv2id'), 'Le fondateur relance l''envoi');
+-- Franchise en base de TVA : pas de TVA sur les factures suivantes
+select admin_save_company('Souki Deals', 'SASU', null, '10 rue de la Paix, 75002 Paris', '98765432100012', null, null, null, 0, 'SD');
+reset role;
+insert into charges (shop_id, week_start, amount_cents) values (:'m1shop', week_of(now()) - 14, 300);
+set role authenticated;
+select t.login(:'admin');
+select admin_set_charge_status((select id from charges where shop_id = :'m1shop' and amount_cents = 300), 'paid');
+select t.ok((select number like '%-000003' and amount_ht_cents = 300 and vat_cents = 0 and vat_rate = 0 from invoices
+             where charge_id = (select id from charges where shop_id = :'m1shop' and amount_cents = 300)),
+            'Sans TVA (franchise) : HT = TTC');
+select t.ok((select seller->>'vat_number' = 'FR12987654321' from invoices where id = :'inv1id'), 'Les anciennes factures gardent les infos du jour d''émission');
+
 -- ---------- Limites ----------
 select t.login(:'admin');
 select admin_update_settings(5, 5, 24, 1, 120, 50000, 24, 150, 3);

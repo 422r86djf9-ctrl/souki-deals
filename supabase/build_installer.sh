@@ -10,3 +10,12 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
   echo
   echo "commit;"
 } > "$HERE/INSTALLER_SOUKI_DEALS.sql"
+
+# Mise à jour des bases déjà installées (n'efface rien, relançable)
+{
+  echo "begin;"
+  echo "-- SOUKI DEALS : mise a jour 005 (factures des commissions). N'efface rien, relancable."
+  cat "$HERE/migrations/005_factures.sql"
+  echo
+  echo "commit;"
+} > "$HERE/MISE_A_JOUR_005_FACTURES.sql"
