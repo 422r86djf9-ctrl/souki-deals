@@ -583,6 +583,23 @@ select t.ok((select count(*) from active_promos(null, null, null) where id = :'p
             'Promo arrêtée : invisible, même sans compte');
 set role authenticated;
 
+-- ---------- IBAN du commerçant ----------
+select t.login(:'m2');
+select t.throws($$select merchant_save_bank('Resto SARL', 'FR76 3000 6000 0112 3456 7890 188')$$, 'BAD_IBAN', 'IBAN avec une mauvaise clé refusé');
+select t.throws($$select merchant_save_bank('Resto SARL', 'FR76 3000 6000 0112 3456 7890')$$, 'BAD_IBAN', 'IBAN trop court refusé');
+select merchant_save_bank('Resto SARL', 'fr76 3000 6000 0112 3456 7890 189', 'agrifrpp');
+select t.ok((select iban = 'FR7630006000011234567890189' and bic = 'AGRIFRPP' from shop_bank), 'IBAN valide enregistré, sans espaces');
+reset role;
+select t.ok(iban_valid('DE89370400440532013000') and iban_valid('BE68539007547034'), 'IBAN allemand et belge reconnus');
+set role authenticated;
+select t.login(:'m1');
+select t.ok((select count(*) from shop_bank) = 0, 'Un autre commerçant ne voit pas cet IBAN');
+select t.login(:'c1');
+select t.ok((select count(*) from shop_bank) = 0, 'Un client ne voit aucun IBAN');
+select t.throws($$select merchant_save_bank('Pirate', 'FR7630006000011234567890189')$$, 'NO_SHOP', 'Un client n''enregistre pas d''IBAN');
+select t.login(:'admin');
+select t.ok((select count(*) from shop_bank where shop_id = :'m2shop') = 1, 'Le fondateur voit l''IBAN pour rembourser');
+
 -- ---------- Limites ----------
 select t.login(:'admin');
 select admin_update_settings(5, 5, 24, 1, 120, 50000, 24, 150, 3);

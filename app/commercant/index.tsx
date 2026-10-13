@@ -53,6 +53,7 @@ export default function Commercant() {
   const [charges, setCharges] = useState<Charge[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [termsOutdated, setTermsOutdated] = useState(false);
+  const [bank, setBank] = useState<{ iban: string } | null | undefined>(undefined);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -64,7 +65,7 @@ export default function Commercant() {
       router.replace('/commercant/inscription');
       return;
     }
-    const [s, p, c, f, tv] = await Promise.all([
+    const [s, p, c, f, tv, bk] = await Promise.all([
       supabase.rpc('merchant_stats'),
       supabase.from('purchases').select('id, amount_cents, commission_cents, free, status, created_at').eq('shop_id', shop).order('created_at', { ascending: false }).limit(30),
       supabase.from('charges').select('id, week_start, amount_cents, status').eq('shop_id', shop).order('week_start', { ascending: false }).limit(12),
@@ -75,6 +76,7 @@ export default function Commercant() {
         .order('seq', { ascending: false })
         .limit(24),
       supabase.from('shops').select('terms_version').eq('id', shop).maybeSingle(),
+      supabase.from('shop_bank').select('iban').maybeSingle(),
     ]);
     if (s.error) setError(errorMessage(s.error));
     else setStats(s.data as Stats);
@@ -83,6 +85,7 @@ export default function Commercant() {
     setInvoices((f.data ?? []) as Invoice[]);
     const v = (tv.data as { terms_version?: string | null } | null)?.terms_version;
     setTermsOutdated(!!v && v !== TERMS_VERSION);
+    setBank((bk.data ?? null) as { iban: string } | null);
   }, []);
 
   // PDF de la facture : lien privé valable 10 minutes
@@ -187,6 +190,9 @@ export default function Commercant() {
                 ? t('Commission à prélever lundi : {amount}', { amount: euros(stats.commission_due_cents) })
                 : t('Souki Deals vous doit {amount} (offres de bienvenue)', { amount: euros(-stats.commission_due_cents) })}
             </Text>
+            {bank === null && (stats.commission_due_cents < 0 || charges.some((c) => c.amount_cents < 0 && c.status === 'pending')) ? (
+              <Text style={{ color: colors.danger, fontWeight: '700', marginTop: 4 }}>{t('Ajoutez votre IBAN pour recevoir ce remboursement.')}</Text>
+            ) : null}
             {stats.welcome_credit_cents ? (
               <Muted>{t('Dont {amount} d’offres de bienvenue remboursées par Souki Deals.', { amount: euros(stats.welcome_credit_cents) })}</Muted>
             ) : null}
@@ -195,6 +201,16 @@ export default function Commercant() {
                 ? t('Prélevée automatiquement sur votre carte chaque lundi.')
                 : t('Le paiement par carte sera activé avant votre premier prélèvement. Souki Deals vous contactera.')}
             </Muted>
+          </View>
+
+          <View style={[styles.card, { flexDirection: 'row', alignItems: 'center' }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontWeight: '800', color: colors.text }}>{t('Mon IBAN')}</Text>
+              <Muted>{bank ? `${bank.iban.slice(0, 4)} •••• ${bank.iban.slice(-4)}` : t('À renseigner pour recevoir vos remboursements')}</Muted>
+            </View>
+            <Pressable onPress={() => router.push('/commercant/banque')} accessibilityRole="button" hitSlop={8}>
+              <Text style={{ color: colors.prune, fontWeight: '800' }}>{bank ? t('Modifier') : t('Ajouter')}</Text>
+            </Pressable>
           </View>
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>

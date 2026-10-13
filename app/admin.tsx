@@ -71,7 +71,7 @@ type ShopRow = {
   zones: { name: string } | null;
 };
 type Dispute = { id: string; amount_cents: number; dispute_reason: string | null; created_at: string; shops: { name: string } | null };
-type ChargeRow = { id: string; week_start: string; amount_cents: number; status: 'pending' | 'paid' | 'failed' | 'waived'; shops: { name: string } | null };
+type ChargeRow = { id: string; shop_id: string; week_start: string; amount_cents: number; status: 'pending' | 'paid' | 'failed' | 'waived'; shops: { name: string } | null };
 type AdminInvoice = Invoice & { charge_id: string | null };
 type ReportRow = { id: number; kind: string; body: string; created_at: string; shops: { name: string } | null };
 type Settings = {
@@ -123,6 +123,7 @@ export default function Admin() {
   const [scores, setScores] = useState<Score[]>([]);
   const [members, setMembers] = useState<Members | null>(null);
   const [promoStats, setPromoStats] = useState<PromoStats | null>(null);
+  const [banks, setBanks] = useState<Record<string, { holder: string; iban: string; bic: string | null; updated_at: string }>>({});
   const [wForm, setWForm] = useState<{ on: boolean; amount: string; min: string; slots: string } | null>(null);
   const [company, setCompany] = useState<Record<CKey, string> | null>(null);
 
@@ -134,7 +135,7 @@ export default function Admin() {
         router.back();
         return;
       }
-      const [s, sh, d, c, r, z, st, inv, co, sc, mb, ps] = await Promise.all([
+      const [s, sh, d, c, r, z, st, inv, co, sc, mb, ps, bk] = await Promise.all([
         supabase.rpc('admin_summary'),
         supabase
           .from('shops')
@@ -142,7 +143,7 @@ export default function Admin() {
           .order('status')
           .order('created_at', { ascending: false }),
         supabase.from('purchases').select('id, amount_cents, dispute_reason, created_at, shops(name)').eq('status', 'disputed').order('created_at'),
-        supabase.from('charges').select('id, week_start, amount_cents, status, shops(name)').order('week_start', { ascending: false }).limit(100),
+        supabase.from('charges').select('id, shop_id, week_start, amount_cents, status, shops(name)').order('week_start', { ascending: false }).limit(100),
         supabase.from('reports').select('id, kind, body, created_at, shops(name)').eq('status', 'open').order('created_at'),
         supabase.from('zones').select('id, name, name_en, name_ar, open, sort').order('sort'),
         supabase.from('settings').select('*').eq('id', 1).single(),
@@ -155,6 +156,7 @@ export default function Admin() {
         supabase.rpc('admin_shop_scores'),
         supabase.rpc('admin_members'),
         supabase.rpc('admin_promo_stats'),
+        supabase.from('shop_bank').select('shop_id, holder, iban, bic, updated_at'),
       ]);
       if (s.error) throw s.error;
       setSummary(s.data as Summary);
@@ -179,6 +181,9 @@ export default function Admin() {
       setInvoices((inv.data ?? []) as AdminInvoice[]);
       setScores((sc.data ?? []) as Score[]);
       setMembers((mb.data ?? null) as Members | null);
+      const bm: Record<string, { holder: string; iban: string; bic: string | null; updated_at: string }> = {};
+      for (const b of (bk.data ?? []) as { shop_id: string; holder: string; iban: string; bic: string | null; updated_at: string }[]) bm[b.shop_id] = b;
+      setBanks(bm);
       const pst = (ps.data ?? null) as PromoStats | null;
       setPromoStats(pst);
       if (pst)
@@ -566,6 +571,24 @@ export default function Admin() {
                 <Text style={{ fontSize: 16, fontWeight: '900', color: c.amount_cents < 0 ? colors.success : colors.prune }}>{euros(c.amount_cents)}</Text>
               </View>
               {c.amount_cents < 0 ? <Muted>{t('Souki Deals doit cette somme au commerçant (offres de bienvenue) : faites le virement puis marquez « Payé ».')}</Muted> : null}
+              {c.amount_cents < 0 && c.status === 'pending' ? (
+                banks[c.shop_id] ? (
+                  <View style={{ backgroundColor: colors.pruneSoft, borderRadius: 10, padding: 10, marginTop: 6 }}>
+                    <Text selectable style={{ color: colors.text, fontWeight: '700' }}>{banks[c.shop_id].holder}</Text>
+                    <Text selectable style={{ color: colors.text, fontWeight: '900', letterSpacing: 1 }}>
+                      {banks[c.shop_id].iban.replace(/(.{4})/g, '$1 ').trim()}
+                    </Text>
+                    {banks[c.shop_id].bic ? <Text selectable style={{ color: colors.text }}>{`BIC ${banks[c.shop_id].bic}`}</Text> : null}
+                    {Date.now() - new Date(banks[c.shop_id].updated_at).getTime() < 7 * 86400000 ? (
+                      <Text style={{ color: colors.danger, fontWeight: '800', marginTop: 4 }}>
+                        {t('IBAN modifié le {date} : appelez le commerçant pour confirmer avant le virement.', { date: shortDate(banks[c.shop_id].updated_at) })}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : (
+                  <Text style={{ color: colors.danger, fontWeight: '700', marginTop: 6 }}>{t('IBAN pas encore renseigné par le commerçant.')}</Text>
+                )
+              ) : null}
               <Muted>{`${t('Semaine du {date}', { date: shortDate(c.week_start) })} · ${
                 c.status === 'paid' ? t('Payé') : c.status === 'failed' ? t('Refusé') : c.status === 'waived' ? t('Offert') : t('À prélever')
               }`}</Muted>
