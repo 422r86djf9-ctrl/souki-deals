@@ -22,6 +22,7 @@ Le halal au meilleur prix, près de chez vous. Appli Android et iPhone (Expo SDK
 - **Suppression du compte** (Mon profil, `delete_my_account`) : compte, profil et jetons effacés ; achats et factures gardés sans le nom ; refusée tant que des commissions ou remboursements sont en cours ; impossible pour le fondateur.
 - **Confidentialité** : écran dans l'appli (`src/lib/confidentialite.ts`) et pages web pour les stores dans `docs/` (GitHub Pages) : `confidentialite.html`, `suppression-compte.html`.
 - **Notifications** (`deals_notify`, textes en fr/en/ar dans `deals_text`, envoi Expo via pg_net, journal `notifications`) : client présent (commerçant), achat à confirmer (client), achat contesté, offre flash à moins de 5 km (une par jour au plus, désactivable dans Mon profil, zone arrondie à 1 km), commerce validé, prélèvement refusé, remboursement versé.
+- **Photos des produits** (Mes produits) : une photo par produit frais ou fait maison (appareil photo ou galerie, recadrée en carré, réduite à 800 px), stockage public `photos/products/<commerce>/` ; pas de photo pour les produits emballés de marque (case « Produit emballé »). Le client agrandit la photo et peut la signaler ; le fondateur la retire depuis Signalements.
 - QR codes dessinés sans internet par `src/lib/qr.ts` (versions 1 à 4, correction M, vérifié avec un décodeur).
 - Tous les réglages (remise minimum, commission, places et durée de l'offre de lancement, validité des bons…) se changent dans l'Administration.
 
@@ -32,10 +33,10 @@ Le halal au meilleur prix, près de chez vous. Appli Android et iPhone (Expo SDK
 - Langues : français, anglais, arabe (écrans de droite à gauche).
 
 ## Serveur
-- `supabase/migrations/000…011` ; `supabase/INSTALLER_SOUKI_DEALS.sql` à coller dans le SQL Editor d'un **nouveau projet Supabase (région Europe)**. Une base déjà installée se met à jour avec `supabase/MISE_A_JOUR_005_FACTURES.sql` puis `supabase/MISE_A_JOUR_006_RELEVE.sql` `supabase/MISE_A_JOUR_007_SCAN.sql` `supabase/MISE_A_JOUR_008_INSCRITS.sql` `supabase/MISE_A_JOUR_009_PROMOS.sql` `supabase/MISE_A_JOUR_010_IBAN.sql` et `supabase/MISE_A_JOUR_011_COMPTE_NOTIFS.sql` (n'effacent rien, relançables). La remise à zéro est refusée dès qu'une facture existe (conservation 10 ans).
+- `supabase/migrations/000…012` ; `supabase/INSTALLER_SOUKI_DEALS.sql` à coller dans le SQL Editor d'un **nouveau projet Supabase (région Europe)**. Une base déjà installée se met à jour avec `supabase/MISE_A_JOUR_005_FACTURES.sql` puis `supabase/MISE_A_JOUR_006_RELEVE.sql` `supabase/MISE_A_JOUR_007_SCAN.sql` `supabase/MISE_A_JOUR_008_INSCRITS.sql` `supabase/MISE_A_JOUR_009_PROMOS.sql` `supabase/MISE_A_JOUR_010_IBAN.sql` `supabase/MISE_A_JOUR_011_COMPTE_NOTIFS.sql` et `supabase/MISE_A_JOUR_012_PHOTOS.sql` (n'effacent rien, relançables). La remise à zéro est refusée dès qu'une facture existe (conservation 10 ans).
 - Envoi des factures : Edge Function `supabase/functions/envoyer-facture` (PDF avec pdf-lib, e-mail avec Resend), appelée par la base via pg_net ; nouvel essai toutes les 30 minutes (5 essais), puis « Envoi impossible » visible du fondateur. Secrets : `RESEND_API_KEY`, `FACTURES_EXPEDITEUR` ; « Verify JWT » désactivé.
 - Tâches automatiques toutes les 10 minutes via pg_cron (`souki_deals_tick`).
-- Tests : `supabase/run_tests.sh` (208 tests sur PostgreSQL local, plus les mises à jour 005 à 011 relancées deux fois et le refus de remise à zéro).
+- Tests : `supabase/run_tests.sh` (216 tests sur PostgreSQL local, plus les mises à jour 005 à 012 relancées deux fois et le refus de remise à zéro).
 - À vérifier après installation : `select jobname from cron.job;` doit afficher `souki-deals-taches` (sinon activer pg_cron dans Database > Extensions et relancer l'installateur).
 - L'administrateur est reconnu à son e-mail **vérifié** : garder « Confirm email » activé dans Supabase et créer le compte du fondateur en premier.
 - Offre de lancement attribuée à la validation par le fondateur (dans l'ordre des validations), pas à l'inscription.

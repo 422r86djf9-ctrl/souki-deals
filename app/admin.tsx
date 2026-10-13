@@ -1,9 +1,10 @@
 // Administration (fondateur uniquement)
 import { Stack, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, RefreshControl, ScrollView, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Linking, Pressable, RefreshControl, ScrollView, Switch, Text, View } from 'react-native';
 import { euros, fullDate, Invoice, invoiceEmailLabel, kindLabel, parseEuros, shortDate, Zone } from '../src/lib/deals';
 import { t, zoneLabel } from '../src/lib/i18n';
+import { photoUrl } from '../src/lib/photos';
 import { errorMessage, supabase, whoami } from '../src/lib/supabase';
 import { Button, Chip, colors, ErrorText, Field, InfoText, Muted, SectionTitle, styles } from '../src/lib/theme';
 
@@ -73,7 +74,7 @@ type ShopRow = {
 type Dispute = { id: string; amount_cents: number; dispute_reason: string | null; created_at: string; shops: { name: string } | null };
 type ChargeRow = { id: string; shop_id: string; week_start: string; amount_cents: number; status: 'pending' | 'paid' | 'failed' | 'waived'; shops: { name: string } | null };
 type AdminInvoice = Invoice & { charge_id: string | null };
-type ReportRow = { id: number; kind: string; body: string; created_at: string; shops: { name: string } | null };
+type ReportRow = { id: number; kind: string; body: string; created_at: string; product_id: number | null; shops: { name: string } | null; products: { name: string; photo_path: string | null } | null };
 type Settings = {
   discount_min: number;
   commission_rate: number;
@@ -144,7 +145,7 @@ export default function Admin() {
           .order('created_at', { ascending: false }),
         supabase.from('purchases').select('id, amount_cents, dispute_reason, created_at, shops(name)').eq('status', 'disputed').order('created_at'),
         supabase.from('charges').select('id, shop_id, week_start, amount_cents, status, shops(name)').order('week_start', { ascending: false }).limit(100),
-        supabase.from('reports').select('id, kind, body, created_at, shops(name)').eq('status', 'open').order('created_at'),
+        supabase.from('reports').select('id, kind, body, created_at, product_id, shops(name), products(name, photo_path)').eq('status', 'open').order('created_at'),
         supabase.from('zones').select('id, name, name_en, name_ar, open, sort').order('sort'),
         supabase.from('settings').select('*').eq('id', 1).single(),
         supabase
@@ -668,8 +669,14 @@ export default function Admin() {
           {reports.map((r) => (
             <View key={r.id} style={styles.card}>
               <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>{r.shops?.name ?? ''}</Text>
-              <Muted>{`${r.kind === 'prix' ? t('Prix faux') : r.kind === 'halal' ? t('Doute sur le halal') : r.kind === 'achat' ? t('Achat contesté') : t('Autre')} · ${shortDate(r.created_at)}`}</Muted>
+              <Muted>{`${r.kind === 'prix' ? t('Prix faux') : r.kind === 'halal' ? t('Doute sur le halal') : r.kind === 'achat' ? t('Achat contesté') : r.kind === 'photo' ? t('Photo trompeuse') : t('Autre')} · ${shortDate(r.created_at)}`}</Muted>
               <Text style={{ color: colors.text, marginTop: 4 }}>{r.body}</Text>
+              {r.kind === 'photo' && r.products?.photo_path ? (
+                <>
+                  <Image source={{ uri: photoUrl(r.products.photo_path) as string }} style={{ width: 140, height: 140, borderRadius: 10, marginTop: 8 }} />
+                  <Button title={t('Retirer la photo')} onPress={() => rpc('admin_remove_product_photo', { p_product_id: r.product_id })} disabled={busy} />
+                </>
+              ) : null}
               <Button title={t('Traité')} variant="secondary" disabled={busy} onPress={() => rpc('admin_close_report', { p_id: r.id })} />
             </View>
           ))}

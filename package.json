@@ -1,6 +1,6 @@
 {
   "name": "souki-deals",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -18,6 +18,8 @@
     "expo-constants": "~18.0.0",
     "expo-device": "~8.0.0",
     "expo-file-system": "~19.0.17",
+    "expo-image-manipulator": "~14.0.0",
+    "expo-image-picker": "~17.0.0",
     "expo-linking": "~8.0.0",
     "expo-location": "~19.0.0",
     "expo-notifications": "~0.32.0",

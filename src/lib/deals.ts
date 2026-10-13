@@ -55,6 +55,8 @@ export type Product = {
   discount_pct: number | null;
   in_stock: boolean;
   active: boolean;
+  packaged?: boolean;
+  photo_path?: string | null;
 };
 
 // 1900 -> « 19,00 € »

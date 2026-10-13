@@ -1,9 +1,10 @@
 // Fiche d'un commerce : produits et prix remisés, bon de réduction, signalement
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Linking, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { euros, finalCents, Kind, kindLabel, openDirections, Product, unitLabel } from '../../src/lib/deals';
 import { t } from '../../src/lib/i18n';
+import { photoUrl } from '../../src/lib/photos';
 import { Promo, promoLabel, promoUntil } from '../../src/lib/promos';
 import { errorMessage, supabase } from '../../src/lib/supabase';
 import { Button, Chip, colors, DiscountTag, ErrorText, InfoText, Muted, SectionTitle, styles } from '../../src/lib/theme';
@@ -31,7 +32,9 @@ export default function Commerce() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [reportOpen, setReportOpen] = useState(false);
-  const [reportKind, setReportKind] = useState<'prix' | 'halal' | 'autre'>('prix');
+  const [reportKind, setReportKind] = useState<'prix' | 'halal' | 'photo' | 'autre'>('prix');
+  const [zoom, setZoom] = useState<Product | null>(null);
+  const [reportProduct, setReportProduct] = useState<number | null>(null);
   const [reportText, setReportText] = useState('');
   const [info, setInfo] = useState('');
 
@@ -42,7 +45,7 @@ export default function Commerce() {
           supabase.from('shops').select('id, name, kind, address, lat, lng, phone, halal_cert, hours, description, discount_pct').eq('id', id).maybeSingle(),
           supabase
             .from('products')
-            .select('id, shop_id, name, category, unit, price_cents, discount_pct, in_stock, active')
+            .select('id, shop_id, name, category, unit, price_cents, discount_pct, in_stock, active, packaged, photo_path')
             .eq('shop_id', id)
             .eq('active', true)
             .order('category')
@@ -83,7 +86,7 @@ export default function Commerce() {
     setInfo('');
     if (reportText.trim().length < 3) return setError(t('Décrivez le problème (3 à 500 caractères).'));
     setBusy(true);
-    const { error } = await supabase.rpc('report_create', { p_shop_id: id, p_kind: reportKind, p_body: reportText.trim(), p_product_id: null });
+    const { error } = await supabase.rpc('report_create', { p_shop_id: id, p_kind: reportKind, p_body: reportText.trim(), p_product_id: reportKind === 'photo' ? reportProduct : null });
     setBusy(false);
     if (error) return setError(errorMessage(error));
     setReportOpen(false);
@@ -160,6 +163,11 @@ export default function Commerce() {
         const pct = p.discount_pct ?? shop.discount_pct;
         return (
           <View key={p.id} style={[styles.card, { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12 }, !p.in_stock && { opacity: 0.6 }]}>
+            {p.photo_path ? (
+              <Pressable onPress={() => setZoom(p)} accessibilityRole="imagebutton" accessibilityLabel={p.name}>
+                <Image source={{ uri: photoUrl(p.photo_path) as string }} style={{ width: 72, height: 72, borderRadius: 10, marginRight: 10, backgroundColor: colors.border }} />
+              </Pressable>
+            ) : null}
             <View style={{ flex: 1, paddingRight: 8 }}>
               <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text }}>{p.name}</Text>
               <Muted>{[p.category, unitLabel(p.unit)].filter(Boolean).join(' · ')}</Muted>
@@ -174,6 +182,27 @@ export default function Commerce() {
         );
       })}
 
+      <Modal visible={!!zoom} transparent animationType="fade" onRequestClose={() => setZoom(null)}>
+        <Pressable onPress={() => setZoom(null)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          {zoom?.photo_path ? (
+            <Image source={{ uri: photoUrl(zoom.photo_path) as string }} style={{ width: '100%', aspectRatio: 1, borderRadius: 16 }} resizeMode="contain" />
+          ) : null}
+          <Text style={{ color: '#fff', fontSize: 18, fontWeight: '800', marginTop: 12 }}>{zoom?.name ?? ''}</Text>
+          <Pressable
+            onPress={() => {
+              setReportKind('photo');
+              setReportProduct(zoom?.id ?? null);
+              setReportOpen(true);
+              setZoom(null);
+            }}
+            accessibilityRole="button"
+            style={{ marginTop: 16, padding: 8 }}
+          >
+            <Text style={{ color: '#fff', textDecorationLine: 'underline' }}>{t('Signaler cette photo')}</Text>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <View style={{ height: 12 }} />
       {reportOpen ? (
         <View style={styles.card}>
@@ -181,6 +210,7 @@ export default function Commerce() {
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
             <Chip label={t('Prix faux')} selected={reportKind === 'prix'} onPress={() => setReportKind('prix')} />
             <Chip label={t('Doute sur le halal')} selected={reportKind === 'halal'} onPress={() => setReportKind('halal')} />
+            {reportKind === 'photo' ? <Chip label={t('Photo trompeuse')} selected onPress={() => undefined} /> : null}
             <Chip label={t('Autre')} selected={reportKind === 'autre'} onPress={() => setReportKind('autre')} />
           </View>
           <TextInput

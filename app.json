@@ -3,7 +3,7 @@
     "name": "Souki Deals",
     "slug": "souki-deals",
     "scheme": "soukideals",
-    "version": "0.6.0",
+    "version": "0.6.1",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "ios": {
@@ -38,6 +38,13 @@
         "expo-notifications",
         {
           "color": "#4A1650"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Souki Deals utilise vos photos pour montrer vos produits aux clients.",
+          "cameraPermission": "Souki Deals utilise l'appareil photo pour scanner les QR codes et photographier vos produits."
         }
       ]
     ],

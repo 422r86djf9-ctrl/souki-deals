@@ -669,6 +669,28 @@ select t.ok((select count(*) from purchases where welcome_cents > 0 and client_i
             'Ses achats restent pour les commerçants, sans son nom');
 set role authenticated;
 
+-- ---------- Photos des produits ----------
+select t.login(:'m1');
+select id as gigot from products where shop_id = :'m1shop' and name = 'Gigot d''agneau' \gset
+update products set photo_path = 'products/' || :'m1shop' || '/gigot-1.jpg' where id = :'gigot';
+select t.ok((select photo_path = 'products/' || :'m1shop' || '/gigot-1.jpg' from products where id = :'gigot'), 'Photo ajoutée à un produit frais');
+select t.throws(format($$update products set photo_path = 'products/%s/x.jpg' where id = %s$$, :'m2shop', :'gigot'), 'BAD_PHOTO',
+                'Photo rangée dans le dossier d''un autre commerce : refusée');
+insert into products (shop_id, name, unit, price_cents, packaged, photo_path)
+values (:'m1shop', 'Lait demi-écrémé 1 L', 'piece', 115, true, 'products/' || :'m1shop' || '/lait.jpg');
+select t.ok((select photo_path is null from products where name = 'Lait demi-écrémé 1 L'), 'Produit emballé (lait) : pas de photo');
+insert into storage.objects (bucket_id, name) values ('photos', 'products/' || :'m1shop' || '/gigot-2.jpg');
+select t.fails(format($$insert into storage.objects (bucket_id, name) values ('photos', 'products/%s/pirate.jpg')$$, :'m2shop'),
+               'Pas d''envoi de photo dans le dossier d''un autre commerce');
+select t.login(:'c1');
+select t.ok((select photo_path is not null from products where id = :'gigot'), 'Le client voit la photo');
+select t.ok(report_create(:'m1shop', 'photo', 'Photo qui ne correspond pas', :'gigot') > 0, 'Le client peut signaler une photo');
+select t.throws(format($$select admin_remove_product_photo(%s)$$, :'gigot'), 'NOT_ADMIN', 'Seul le fondateur retire une photo');
+select t.login(:'admin');
+select admin_remove_product_photo(:'gigot');
+select t.ok((select photo_path is null from products where id = :'gigot')
+            and not exists (select 1 from reports where kind = 'photo' and status = 'open'), 'Photo retirée, signalement traité');
+
 -- ---------- Limites ----------
 select t.login(:'admin');
 select admin_update_settings(5, 5, 24, 1, 120, 50000, 24, 150, 3);

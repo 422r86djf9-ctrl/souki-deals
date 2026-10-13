@@ -55,7 +55,7 @@ begin
       'merchant_save_promo', 'merchant_stop_promo', 'active_promos', 'admin_update_welcome', 'admin_promo_stats',
       'iban_valid', 'merchant_save_bank', 'delete_my_account', 'register_push_token', 'unregister_push_token',
       'set_my_area', 'set_my_notif_promos', 'fmt_euros', 'deals_text', 'deals_notify', 'notify_checkin',
-      'notify_purchase', 'notify_promo', 'notify_shop', 'notify_charge')
+      'notify_purchase', 'notify_promo', 'notify_shop', 'notify_charge', 'admin_remove_product_photo')
   loop
     execute format('drop function if exists %s cascade', r.sig);
   end loop;
