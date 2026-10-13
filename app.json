@@ -3,12 +3,13 @@
     "name": "Souki Deals",
     "slug": "souki-deals",
     "scheme": "soukideals",
-    "version": "0.5.1",
+    "version": "0.6.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "fr.soukideals.app",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "usesAppleSignIn": true
     },
     "android": {
       "package": "fr.soukideals.app",
@@ -29,6 +30,14 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "Souki Deals utilise votre position pour afficher les commerces halal les plus proches."
+        }
+      ],
+      "expo-apple-authentication",
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "color": "#4A1650"
         }
       ]
     ],

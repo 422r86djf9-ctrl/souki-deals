@@ -2,6 +2,7 @@ import { Href, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { euros } from '../src/lib/deals';
+import { registerForPush, unregisterPush, updateMyArea } from '../src/lib/push';
 import { Espace, getEspace, setEspace } from '../src/lib/espace';
 import { t } from '../src/lib/i18n';
 import { errorMessage, supabase, whoami, Whoami } from '../src/lib/supabase';
@@ -63,6 +64,8 @@ export default function Accueil() {
       const e = (await getEspace()) ?? (data.shop ? 'commercant' : 'particulier');
       setEspaceState(e);
       setMe(data);
+      registerForPush();
+      updateMyArea();
       const [w, pr] = await Promise.all([supabase.rpc('client_welcome'), supabase.rpc('active_promos', { p_lat: null, p_lng: null, p_radius_km: null })]);
       setWelcome((w.data ?? null) as { amount_cents: number; min_cents: number } | null);
       setPromoCount(((pr.data ?? []) as unknown[]).length);
@@ -84,6 +87,7 @@ export default function Accueil() {
   }
 
   async function logout() {
+    await unregisterPush();
     await supabase.auth.signOut();
     router.replace('/connexion');
   }

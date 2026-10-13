@@ -600,6 +600,75 @@ select t.throws($$select merchant_save_bank('Pirate', 'FR76300060000112345678901
 select t.login(:'admin');
 select t.ok((select count(*) from shop_bank where shop_id = :'m2shop') = 1, 'Le fondateur voit l''IBAN pour rembourser');
 
+-- ---------- Notifications ----------
+select t.login(:'m1');
+select t.throws($$select register_push_token('nimporte quoi')$$, 'BAD_TOKEN', 'Jeton invalide refusé');
+select register_push_token('ExponentPushToken[commercant-m1]');
+select t.login(:'c1');
+select register_push_token('ExponentPushToken[client-c1]');
+select t.ok((select count(*) from push_tokens) = 1, 'Chacun ne voit que son propre jeton');
+-- Client présent : le commerçant est prévenu (en arabe s'il l'a choisi)
+reset role;
+update profiles set lang = 'fr' where id = :'c1';
+delete from purchases where client_id = :'c1' and shop_id = :'m1shop';
+set role authenticated;
+select (client_checkin(:'m1code')->>'checkin_id') as nck \gset
+select t.login(:'m1');
+select t.ok(exists (select 1 from notifications where key = 'client_present' and body like 'Karim a scanné%' and sent),
+            'Client présent : le commerçant reçoit « Karim a scanné votre QR code »');
+select merchant_complete_checkin(:'nck', 1234);
+select t.login(:'c1');
+select t.ok(exists (select 1 from notifications where key = 'purchase_to_confirm' and body = 'Vous avez payé 12,34 € chez Boucherie Al Baraka ?'),
+            'Achat saisi : le client doit confirmer 12,34 €');
+select client_answer_purchase((select id from purchases where amount_cents = 1234), false, 'Pas ce montant');
+select t.login(:'m1');
+select t.ok(exists (select 1 from notifications where key = 'purchase_disputed' and body like '%12,34 €%'), 'Achat contesté : le commerçant est prévenu');
+select t.login(:'admin');
+select admin_resolve_purchase((select id from purchases where amount_cents = 1234), 'cancelled');
+reset role;
+select t.ok((select count(*) from net.calls where body::text like '%commercant-m1%') >= 2, 'Envoi vers le téléphone du commerçant demandé');
+set role authenticated;
+-- Offre flash : clients proches, une seule par jour, désactivable
+select t.login(:'c1');
+select set_my_area(48.93712, 2.35815);
+select t.ok((select area_lat = 48.94 and area_lng = 2.36 from profiles where id = auth.uid()), 'Position arrondie à environ 1 km');
+select t.login(:'c2');
+insert into profiles (id, full_name) values (auth.uid(), 'Yasmine') on conflict (id) do nothing;
+select set_my_area(43.30, 5.37);
+select t.login(:'m1');
+select merchant_stop_promo(id) from promos where shop_id = :'m1shop' and active;
+select merchant_save_promo('flash', 'Côtelettes', 25, null, 0);
+select t.login(:'c1');
+select t.ok(exists (select 1 from notifications where key = 'flash_nearby' and body like 'Boucherie Al Baraka : Côtelettes à -25 %%'),
+            'Offre flash : le client proche est prévenu');
+select t.login(:'c2');
+select t.ok(not exists (select 1 from notifications where key = 'flash_nearby'), 'Client loin (Marseille) : pas prévenu');
+select t.login(:'m1');
+select merchant_save_promo('flash', 'Merguez maison', 30, null, 0);
+select t.login(:'c1');
+select t.ok((select count(*) from notifications where key = 'flash_nearby') = 1, 'Une seule offre flash par jour au plus');
+select set_my_notif_promos(false);
+select t.ok((select not notif_promos from profiles where id = auth.uid()), 'Le client peut couper les offres');
+-- Remboursement versé
+select t.login(:'m2');
+select t.ok(exists (select 1 from notifications where key = 'refund_sent' and body like '%20,00 €%'), 'Remboursement : le commerçant est prévenu');
+
+-- ---------- Suppression du compte ----------
+select t.login(:'admin');
+select t.throws($$select delete_my_account()$$, 'NOT_ALLOWED', 'Le compte du fondateur ne se supprime pas');
+select t.login(:'m1');
+select t.throws($$select delete_my_account()$$, 'BALANCE_DUE', 'Commerçant avec des commissions en cours : suppression refusée');
+select t.login('bbbbbbbb-0000-0000-0000-000000000031');
+select count(*) as nb31 from purchases where client_id = 'bbbbbbbb-0000-0000-0000-000000000031' \gset
+select delete_my_account();
+reset role;
+select t.ok(not exists (select 1 from auth.users where id = 'bbbbbbbb-0000-0000-0000-000000000031')
+            and not exists (select 1 from profiles where id = 'bbbbbbbb-0000-0000-0000-000000000031'),
+            'Compte client supprimé avec son profil');
+select t.ok((select count(*) from purchases where welcome_cents > 0 and client_id is null) >= 1 and :'nb31'::int >= 1,
+            'Ses achats restent pour les commerçants, sans son nom');
+set role authenticated;
+
 -- ---------- Limites ----------
 select t.login(:'admin');
 select admin_update_settings(5, 5, 24, 1, 120, 50000, 24, 150, 3);

@@ -18,6 +18,10 @@ Le halal au meilleur prix, près de chez vous. Appli Android et iPhone (Expo SDK
 - **IBAN du commerçant** (Mon commerce > Mon IBAN, table `shop_bank` lisible seulement par lui et le fondateur, clé de contrôle vérifiée) : affiché au fondateur à côté de chaque remboursement à faire, avec une alerte si l'IBAN a changé depuis moins de 7 jours.
 - **Promos des commerçants** (Mon commerce > Mes promos, à leurs frais) : offre flash (un produit de -10 à -90 %, jusqu'à 7 jours) et produit offert dès un montant (jusqu'à 30 jours) ; 3 en cours au plus. Visibles par les clients dans « Offres du moment » (rayon 15 km, flash d'abord) et sur la fiche du commerce.
 - Conditions commerçant : version du 13/10/2026 (offre de bienvenue, promos) : les commerces déjà inscrits l'acceptent dans l'appli.
+- **Connexion Google et Apple** (`src/lib/social.ts`) : Google par le navigateur sécurisé (OAuth Supabase, retour `soukideals://auth`), Apple sur iPhone (`signInWithIdToken`). Le nom est repris dans le profil.
+- **Suppression du compte** (Mon profil, `delete_my_account`) : compte, profil et jetons effacés ; achats et factures gardés sans le nom ; refusée tant que des commissions ou remboursements sont en cours ; impossible pour le fondateur.
+- **Confidentialité** : écran dans l'appli (`src/lib/confidentialite.ts`) et pages web pour les stores dans `docs/` (GitHub Pages) : `confidentialite.html`, `suppression-compte.html`.
+- **Notifications** (`deals_notify`, textes en fr/en/ar dans `deals_text`, envoi Expo via pg_net, journal `notifications`) : client présent (commerçant), achat à confirmer (client), achat contesté, offre flash à moins de 5 km (une par jour au plus, désactivable dans Mon profil, zone arrondie à 1 km), commerce validé, prélèvement refusé, remboursement versé.
 - QR codes dessinés sans internet par `src/lib/qr.ts` (versions 1 à 4, correction M, vérifié avec un décodeur).
 - Tous les réglages (remise minimum, commission, places et durée de l'offre de lancement, validité des bons…) se changent dans l'Administration.
 
@@ -28,10 +32,10 @@ Le halal au meilleur prix, près de chez vous. Appli Android et iPhone (Expo SDK
 - Langues : français, anglais, arabe (écrans de droite à gauche).
 
 ## Serveur
-- `supabase/migrations/000…010` ; `supabase/INSTALLER_SOUKI_DEALS.sql` à coller dans le SQL Editor d'un **nouveau projet Supabase (région Europe)**. Une base déjà installée se met à jour avec `supabase/MISE_A_JOUR_005_FACTURES.sql` puis `supabase/MISE_A_JOUR_006_RELEVE.sql` `supabase/MISE_A_JOUR_007_SCAN.sql` `supabase/MISE_A_JOUR_008_INSCRITS.sql` `supabase/MISE_A_JOUR_009_PROMOS.sql` et `supabase/MISE_A_JOUR_010_IBAN.sql` (n'effacent rien, relançables). La remise à zéro est refusée dès qu'une facture existe (conservation 10 ans).
+- `supabase/migrations/000…011` ; `supabase/INSTALLER_SOUKI_DEALS.sql` à coller dans le SQL Editor d'un **nouveau projet Supabase (région Europe)**. Une base déjà installée se met à jour avec `supabase/MISE_A_JOUR_005_FACTURES.sql` puis `supabase/MISE_A_JOUR_006_RELEVE.sql` `supabase/MISE_A_JOUR_007_SCAN.sql` `supabase/MISE_A_JOUR_008_INSCRITS.sql` `supabase/MISE_A_JOUR_009_PROMOS.sql` `supabase/MISE_A_JOUR_010_IBAN.sql` et `supabase/MISE_A_JOUR_011_COMPTE_NOTIFS.sql` (n'effacent rien, relançables). La remise à zéro est refusée dès qu'une facture existe (conservation 10 ans).
 - Envoi des factures : Edge Function `supabase/functions/envoyer-facture` (PDF avec pdf-lib, e-mail avec Resend), appelée par la base via pg_net ; nouvel essai toutes les 30 minutes (5 essais), puis « Envoi impossible » visible du fondateur. Secrets : `RESEND_API_KEY`, `FACTURES_EXPEDITEUR` ; « Verify JWT » désactivé.
 - Tâches automatiques toutes les 10 minutes via pg_cron (`souki_deals_tick`).
-- Tests : `supabase/run_tests.sh` (192 tests sur PostgreSQL local, plus les mises à jour 005 à 010 relancées deux fois et le refus de remise à zéro).
+- Tests : `supabase/run_tests.sh` (208 tests sur PostgreSQL local, plus les mises à jour 005 à 011 relancées deux fois et le refus de remise à zéro).
 - À vérifier après installation : `select jobname from cron.job;` doit afficher `souki-deals-taches` (sinon activer pg_cron dans Database > Extensions et relancer l'installateur).
 - L'administrateur est reconnu à son e-mail **vérifié** : garder « Confirm email » activé dans Supabase et créer le compte du fondateur en premier.
 - Offre de lancement attribuée à la validation par le fondateur (dans l'ordre des validations), pas à l'inscription.
@@ -41,3 +45,11 @@ Le halal au meilleur prix, près de chez vous. Appli Android et iPhone (Expo SDK
 - Supabase : projet « Souki Deals » `https://rczotdgtkwfbnrbvyjon.supabase.co` (région Europe), clé publique dans `app.json` > `extra`. Installateur appliqué le 11/10/2026, pg_cron actif.
 - Projet Expo à créer (`souki-deals`) et `extra.eas.projectId` à ajouter.
 - Builds EAS depuis GitHub, profil `test` (APK).
+
+## À configurer (une fois)
+- **Google** : Google Cloud Console > identifiants OAuth « Application Web » ; dans Supabase > Authentication > Providers > Google : ID client + secret ; dans Supabase > Authentication > URL Configuration > Redirect URLs : `soukideals://**`.
+- **Apple** (iPhone, compte Apple Developer) : Supabase > Providers > Apple activé avec le Bundle ID `fr.soukideals.app`.
+- **Notifications Android** : projet Firebase, `google-services.json` à la racine + `"googleServicesFile": "./google-services.json"` dans `app.json` > `android`, clé FCM V1 déposée sur expo.dev (Credentials). Sans ça, l'appli marche mais sans notifications.
+- **E-mails** : nom de domaine + Resend branché en SMTP dans Supabase > Authentication > Emails (sinon quelques e-mails de confirmation par heure seulement).
+- **Pages web** : GitHub > souki-deals > Settings > Pages > « Deploy from a branch », `main`, dossier `/docs`.
+

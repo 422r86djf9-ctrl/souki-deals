@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { LanguagePicker } from '../src/components/LanguagePicker';
 import { Espace, getEspace, setEspace } from '../src/lib/espace';
+import { appleAvailable, signInWithApple, signInWithGoogle } from '../src/lib/social';
 import { t } from '../src/lib/i18n';
 import { errorMessage, supabase } from '../src/lib/supabase';
 import { Button, colors, ErrorText, Field, InfoText, Muted, styles } from '../src/lib/theme';
@@ -35,12 +36,14 @@ export default function Connexion() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
+  const [apple, setApple] = useState(false);
 
   useEffect(() => {
     getEspace().then((e) => {
       setEspaceState(e);
       setReady(true);
     });
+    appleAvailable().then(setApple);
   }, []);
 
   async function choose(e: Espace | null) {
@@ -68,6 +71,20 @@ export default function Connexion() {
         if (data.session) router.replace('/profil');
         else setInfo(t("Compte créé. Ouvrez l'e-mail de confirmation, puis connectez-vous."));
       }
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function social(provider: 'google' | 'apple') {
+    setError('');
+    setInfo('');
+    setLoading(true);
+    try {
+      const ok = provider === 'google' ? await signInWithGoogle() : await signInWithApple();
+      if (ok) router.replace('/accueil');
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -135,6 +152,36 @@ export default function Connexion() {
             <Text style={{ color: colors.prune, fontWeight: '700', textDecorationLine: 'underline' }}>{t('Changer')}</Text>
           </Pressable>
         </View>
+        <Pressable
+          onPress={() => social('google')}
+          disabled={loading}
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.card,
+            { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, opacity: pressed || loading ? 0.7 : 1 },
+          ]}
+        >
+          <Text style={{ fontSize: 20, fontWeight: '900', color: '#4285F4', marginRight: 10 }}>G</Text>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text }}>{t('Continuer avec Google')}</Text>
+        </Pressable>
+        {apple ? (
+          <Pressable
+            onPress={() => social('apple')}
+            disabled={loading}
+            accessibilityRole="button"
+            style={({ pressed }) => [
+              styles.card,
+              { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, backgroundColor: '#000', borderColor: '#000', opacity: pressed || loading ? 0.7 : 1 },
+            ]}
+          >
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>{`\uF8FF  ${t('Continuer avec Apple')}`}</Text>
+          </Pressable>
+        ) : null}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 12 }}>
+          <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+          <Text style={{ marginHorizontal: 10, color: colors.muted }}>{t('ou avec votre e-mail')}</Text>
+          <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+        </View>
         <Field label={t('E-mail')} value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" placeholder="exemple@gmail.com" />
         <Field
           label={t('Mot de passe')}
@@ -160,7 +207,10 @@ export default function Connexion() {
             {mode === 'login' ? t('Pas encore de compte ? Créer un compte') : t('Déjà un compte ? Se connecter')}
           </Text>
         </Pressable>
-        <View style={{ marginTop: 28 }}>
+        <Pressable onPress={() => router.push('/confidentialite')} accessibilityRole="link" style={{ alignItems: 'center', paddingVertical: 8 }}>
+          <Text style={{ color: colors.muted, textDecorationLine: 'underline', fontSize: 13 }}>{t('Confidentialité et données personnelles')}</Text>
+        </Pressable>
+        <View style={{ marginTop: 20 }}>
           <Muted>
             {pro
               ? t('Après la connexion, inscrivez votre commerce : rien à payer si on ne vous amène pas de clients.')

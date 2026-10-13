@@ -59,3 +59,11 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
   echo
   echo "commit;"
 } > "$HERE/MISE_A_JOUR_010_IBAN.sql"
+
+{
+  echo "begin;"
+  echo "-- SOUKI DEALS : mise a jour 011 (suppression du compte, notifications). N'efface rien, relancable."
+  cat "$HERE/migrations/011_compte_notifications.sql"
+  echo
+  echo "commit;"
+} > "$HERE/MISE_A_JOUR_011_COMPTE_NOTIFS.sql"
