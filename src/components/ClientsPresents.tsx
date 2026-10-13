@@ -7,8 +7,9 @@ import { euros, parseEuros, timeLabel } from '../lib/deals';
 import { t } from '../lib/i18n';
 import { errorMessage, supabase } from '../lib/supabase';
 import { Button, colors, ErrorText, InfoText, Muted, SectionTitle, styles } from '../lib/theme';
+import { WelcomeBanner } from './WelcomeBanner';
 
-type Visit = { id: string; code: string; first_name: string; created_at: string; expires_at: string };
+type Visit = { id: string; code: string; first_name: string; created_at: string; expires_at: string; welcome_cents?: number; welcome_min_cents?: number };
 
 const POLL_MS = 8000;
 
@@ -85,6 +86,7 @@ export function ClientsPresents({ active, discountPct, onPurchase }: { active: b
             <Text style={{ fontSize: 18, fontWeight: '800', color: colors.prune, letterSpacing: 2 }}>{v.code}</Text>
           </View>
           <Muted>{t('Arrivé à {time} · remise de {pct} % à appliquer', { time: timeLabel(v.created_at), pct: String(discountPct).replace('.', ',') })}</Muted>
+          <WelcomeBanner cents={v.welcome_cents ?? 0} minCents={v.welcome_min_cents ?? 0} />
           <Text style={{ fontWeight: '700', color: colors.text, marginTop: 10 }}>{t('Montant payé, remise déduite (€)')}</Text>
           <TextInput
             value={amounts[v.id] ?? ''}

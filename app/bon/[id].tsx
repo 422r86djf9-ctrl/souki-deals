@@ -16,7 +16,7 @@ type Voucher = {
   expires_at: string;
   shops: { name: string; discount_pct: number; address: string } | null;
 };
-type Purchase = { id: string; amount_cents: number; status: 'pending' | 'confirmed' | 'disputed' | 'cancelled' };
+type Purchase = { id: string; amount_cents: number; welcome_cents: number; status: 'pending' | 'confirmed' | 'disputed' | 'cancelled' };
 
 export default function Bon() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -35,7 +35,7 @@ export default function Bon() {
     const vv = data as unknown as Voucher | null;
     setV(vv);
     if (vv?.status === 'used') {
-      const { data: p } = await supabase.from('purchases').select('id, amount_cents, status').eq('voucher_id', id).maybeSingle();
+      const { data: p } = await supabase.from('purchases').select('id, amount_cents, welcome_cents, status').eq('voucher_id', id).maybeSingle();
       setPurchase(p as Purchase | null);
     }
     setLoading(false);
@@ -99,7 +99,7 @@ export default function Bon() {
       </View>
 
       {purchase && purchase.status === 'pending' ? (
-        <PurchaseAnswer id={purchase.id} amountCents={purchase.amount_cents} shopName={v.shops?.name ?? ''} onDone={load} />
+        <PurchaseAnswer id={purchase.id} amountCents={purchase.amount_cents} welcomeCents={purchase.welcome_cents} shopName={v.shops?.name ?? ''} onDone={load} />
       ) : null}
       {purchase && purchase.status !== 'pending' ? (
         <View style={styles.card}>

@@ -10,7 +10,7 @@ import { errorMessage, supabase } from '../../src/lib/supabase';
 import { Button, Chip, colors, ErrorText, InfoText, Muted, SectionTitle, styles } from '../../src/lib/theme';
 
 const FIRST_YEAR = 2026;
-type Cfg = { discount_min: number; commission_rate: number; launch_slots: number; launch_free_months: number };
+type Cfg = { discount_min: number; commission_rate: number; launch_slots: number; launch_free_months: number; welcome_amount_cents?: number; welcome_min_cents?: number };
 
 export default function Releve() {
   const thisYear = new Date().getFullYear();
@@ -30,7 +30,7 @@ export default function Releve() {
     setError('');
     const [s, cfg] = await Promise.all([
       supabase.rpc('merchant_year_statement', { p_year: y }),
-      supabase.from('settings').select('discount_min, commission_rate, launch_slots, launch_free_months').eq('id', 1).single(),
+      supabase.from('settings').select('discount_min, commission_rate, launch_slots, launch_free_months, welcome_amount_cents, welcome_min_cents').eq('id', 1).single(),
     ]);
     if (s.error) setError(errorMessage(s.error));
     else setSt(s.data as Statement);
@@ -61,6 +61,8 @@ export default function Releve() {
       commission: Number(settings?.commission_rate ?? 5),
       launchSlots: Number(settings?.launch_slots ?? 150),
       launchMonths: Number(settings?.launch_free_months ?? 3),
+      welcomeCents: settings?.welcome_amount_cents,
+      welcomeMinCents: settings?.welcome_min_cents,
       seller: st?.seller ?? null,
       shop: st ? { name: st.shop.name, address: st.shop.address, siret: st.shop.siret } : null,
       acceptedAt: st?.terms.accepted_at ?? null,
@@ -118,6 +120,7 @@ export default function Releve() {
                 <Text style={{ fontWeight: '800', color: colors.prune }}>{value}</Text>
               </View>
             ))}
+            {st.welcome_cents ? <Muted>{t('Bienvenue remboursée par Souki Deals : {amount}', { amount: eur(st.welcome_cents) })}</Muted> : null}
             {st.offered_cents > 0 ? <Muted>{t('Commission offerte (lancement) : {amount}', { amount: eur(st.offered_cents) })}</Muted> : null}
             {st.unbilled_cents > 0 ? <Muted>{t('Pas encore prélevé : {amount} (prochaine facture)', { amount: eur(st.unbilled_cents) })}</Muted> : null}
           </View>

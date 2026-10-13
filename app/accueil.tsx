@@ -1,6 +1,7 @@
 import { Href, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { euros } from '../src/lib/deals';
 import { Espace, getEspace, setEspace } from '../src/lib/espace';
 import { t } from '../src/lib/i18n';
 import { errorMessage, supabase, whoami, Whoami } from '../src/lib/supabase';
@@ -49,6 +50,8 @@ export default function Accueil() {
   const [espace, setEspaceState] = useState<Espace>('particulier');
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [welcome, setWelcome] = useState<{ amount_cents: number; min_cents: number } | null>(null);
+  const [promoCount, setPromoCount] = useState(0);
 
   const load = useCallback(async () => {
     setError('');
@@ -60,6 +63,9 @@ export default function Accueil() {
       const e = (await getEspace()) ?? (data.shop ? 'commercant' : 'particulier');
       setEspaceState(e);
       setMe(data);
+      const [w, pr] = await Promise.all([supabase.rpc('client_welcome'), supabase.rpc('active_promos', { p_lat: null, p_lng: null, p_radius_km: null })]);
+      setWelcome((w.data ?? null) as { amount_cents: number; min_cents: number } | null);
+      setPromoCount(((pr.data ?? []) as unknown[]).length);
     } catch (e) {
       setError(errorMessage(e));
     }
@@ -135,6 +141,17 @@ export default function Accueil() {
                   href="/achats"
                   strong
                 />
+              ) : null}
+              {welcome && welcome.amount_cents > 0 ? (
+                <View style={[styles.card, { backgroundColor: colors.saffron, borderColor: colors.saffron }]}>
+                  <Text style={{ fontSize: 20, fontWeight: '900', color: colors.text }}>{t('Bienvenue : {amount} offerts', { amount: euros(welcome.amount_cents) })}</Text>
+                  <Text style={{ color: colors.text, marginTop: 2 }}>
+                    {t('Sur votre premier achat dès {min}, dans le commerce partenaire de votre choix. En plus de la remise habituelle.', { min: euros(welcome.min_cents) })}
+                  </Text>
+                </View>
+              ) : null}
+              {promoCount > 0 ? (
+                <Card title={t('Offres du moment ({n})', { n: promoCount })} subtitle={t('Offres flash et cadeaux des commerces près de chez vous.')} href="/offres" />
               ) : null}
               <Card title={t('Je suis dans le magasin')} subtitle={t('Scannez le QR code Souki Deals au comptoir pour avoir votre remise.')} href="/entree" strong />
               <Card title={t('Autour de moi')} subtitle={t('Boucheries, restaurants, épiceries halal près de vous, avec leur remise.')} href="/autour" />

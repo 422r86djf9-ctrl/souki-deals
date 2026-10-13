@@ -11,7 +11,7 @@ begin
   if exists (select 1 from information_schema.tables
              where table_schema = 'public'
                and table_name not in ('settings', 'zones', 'profiles', 'shops', 'products',
-                                      'vouchers', 'purchases', 'charges', 'reports', 'company', 'invoices', 'checkins')) then
+                                      'vouchers', 'purchases', 'charges', 'reports', 'company', 'invoices', 'checkins', 'promos')) then
     raise exception 'SOUKI DEALS : ce projet Supabase contient d''autres tables. Installez Souki Deals dans un projet dédié.';
   end if;
 end $$;
@@ -29,7 +29,7 @@ begin
 end $$;
 
 drop table if exists
-  public.checkins, public.invoices, public.company, public.reports, public.charges, public.purchases, public.vouchers,
+  public.promos, public.checkins, public.invoices, public.company, public.reports, public.charges, public.purchases, public.vouchers,
   public.products, public.shops, public.profiles, public.zones, public.settings
 cascade;
 
@@ -51,7 +51,8 @@ begin
       'merchant_resend_invoice', 'current_terms_version', 'merchant_accept_terms', 'merchant_year_statement',
       'new_shop_code', 'purchases_close_checkin', 'first_name', 'client_checkin', 'client_cancel_checkin',
       'client_answer_checkin', 'merchant_checkins', 'merchant_complete_checkin', 'merchant_dismiss_checkin',
-      'admin_shop_scores', 'admin_members')
+      'admin_shop_scores', 'admin_members', 'welcome_for', 'client_welcome', 'merchant_voucher_info',
+      'merchant_save_promo', 'merchant_stop_promo', 'active_promos', 'admin_update_welcome', 'admin_promo_stats')
   loop
     execute format('drop function if exists %s cascade', r.sig);
   end loop;

@@ -2,13 +2,15 @@
 // La version doit correspondre à public.current_terms_version() côté serveur (migration 006).
 // Toute modification du texte = nouvelle version, à changer ici ET dans la base.
 
-export const TERMS_VERSION = '2026-10-12';
+export const TERMS_VERSION = '2026-10-13';
 
 export type TermsParams = {
   discountMin: number;
   commission: number;
   launchSlots: number;
   launchMonths: number;
+  welcomeCents?: number;
+  welcomeMinCents?: number;
   seller?: { legal_name?: string | null; legal_form?: string | null; address?: string | null; siret?: string | null } | null;
   // Acceptation (pour le PDF du commerçant)
   shop?: { name: string; address?: string | null; siret?: string | null } | null;
@@ -47,6 +49,8 @@ export const TERMS_ARTICLES = (p: TermsParams): { title: string; body: string[] 
       body: [
         `Le Commerçant accorde une remise d'au moins ${n(p.discountMin)} % aux clients qui présentent un bon Souki Deals valide. Il peut choisir une remise plus forte, pour tout le commerce ou par produit.`,
         'Les prix affichés dans l\'application sont ceux du Commerçant, qui les tient à jour. La remise est déduite directement en caisse.',
+        `Offre de bienvenue Souki Deals : quand l'application l'indique, le Commerçant déduit aussi ${n((p.welcomeCents ?? 1000) / 100)} € du premier achat d'un nouveau client (achat d'au moins ${n((p.welcomeMinCents ?? 3000) / 100)} €). Cette somme est payée par Souki Deals : elle est remboursée au Commerçant en la déduisant de sa commission de la semaine, ou par virement si elle la dépasse. La commission est calculée sur le montant de l'achat, bienvenue comprise.`,
+        'Le Commerçant peut proposer ses propres promotions (offre flash, produit offert), à ses frais ; il les applique en caisse comme annoncé dans l\'application.',
       ],
     },
     {
@@ -67,7 +71,7 @@ export const TERMS_ARTICLES = (p: TermsParams): { title: string; body: string[] 
     {
       title: '6. Paiement et factures',
       body: [
-        'Chaque lundi, les commissions des achats confirmés de la semaine précédente sont prélevées sur la carte bancaire enregistrée par le Commerçant.',
+        'Chaque lundi, les commissions des achats confirmés de la semaine précédente, moins les offres de bienvenue à rembourser, sont prélevées sur la carte bancaire enregistrée par le Commerçant. Si les remboursements dépassent les commissions, Souki Deals verse la différence au Commerçant.',
         'Chaque paiement donne lieu à une facture envoyée par e-mail et disponible dans l\'application (Mon commerce > Mes factures), avec un relevé annuel pour le comptable.',
         'Si un prélèvement est refusé, ou reste impayé 7 jours, le commerce est masqué aux clients jusqu\'au paiement. Tout retard entraîne des pénalités au taux de 3 fois le taux d\'intérêt légal et une indemnité forfaitaire de 40 € pour frais de recouvrement (art. L441-10 du Code de commerce).',
       ],

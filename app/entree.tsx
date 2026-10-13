@@ -18,7 +18,7 @@ type Visit = {
   shops: { name: string; discount_pct: number } | null;
   vouchers: { code: string } | null;
 };
-type Purchase = { id: string; amount_cents: number; status: string };
+type Purchase = { id: string; amount_cents: number; welcome_cents: number; status: string };
 
 const POLL_MS = 4000;
 
@@ -29,6 +29,7 @@ export default function Entree() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [typed, setTyped] = useState('');
+  const [welcome, setWelcome] = useState<{ amount_cents: number; min_cents: number } | null>(null);
 
   const loadVisit = useCallback(async (id?: string) => {
     const { data: u } = await supabase.auth.getUser();
@@ -43,7 +44,7 @@ export default function Entree() {
     const v = (data ?? null) as unknown as Visit | null;
     setVisit(v);
     if (v?.purchase_id) {
-      const { data: p } = await supabase.from('purchases').select('id, amount_cents, status').eq('id', v.purchase_id).single();
+      const { data: p } = await supabase.from('purchases').select('id, amount_cents, welcome_cents, status').eq('id', v.purchase_id).single();
       setPurchase((p ?? null) as Purchase | null);
     }
     setLoading(false);
@@ -52,6 +53,7 @@ export default function Entree() {
   useFocusEffect(
     useCallback(() => {
       loadVisit();
+      supabase.rpc('client_welcome').then(({ data }) => setWelcome((data ?? null) as { amount_cents: number; min_cents: number } | null));
     }, [loadVisit]),
   );
 
@@ -130,6 +132,11 @@ export default function Entree() {
           <View style={{ marginVertical: 10 }}>
             <DiscountTag pct={visit.shops?.discount_pct ?? 5} big />
           </View>
+          {welcome && welcome.amount_cents > 0 ? (
+            <Text style={{ color: colors.success, fontWeight: '800', textAlign: 'center', marginBottom: 8 }}>
+              {t('+ {amount} offerts sur ce premier achat dès {min} : le commerçant les déduit.', { amount: euros(welcome.amount_cents), min: euros(welcome.min_cents) })}
+            </Text>
+          ) : null}
           <Text style={{ fontSize: 15, color: colors.muted }}>{t('Votre code')}</Text>
           <Text style={{ fontSize: 36, fontWeight: '900', color: colors.prune, letterSpacing: 4 }}>{visit.vouchers?.code ?? ''}</Text>
           <Text style={{ color: colors.text, textAlign: 'center', marginTop: 10 }}>
@@ -145,7 +152,7 @@ export default function Entree() {
       {/* 3. Montant saisi : le client confirme */}
       {visit?.status === 'done' && purchase ? (
         purchase.status === 'pending' ? (
-          <PurchaseAnswer id={purchase.id} amountCents={purchase.amount_cents} shopName={visit.shops?.name ?? ''} onDone={() => loadVisit(visit.id)} />
+          <PurchaseAnswer id={purchase.id} amountCents={purchase.amount_cents} welcomeCents={purchase.welcome_cents} shopName={visit.shops?.name ?? ''} onDone={() => loadVisit(visit.id)} />
         ) : (
           <View style={[styles.card, { alignItems: 'center', paddingVertical: 22 }]}>
             <Text style={{ fontSize: 22, fontWeight: '900', color: colors.success }}>{t('Achat enregistré, merci !')}</Text>

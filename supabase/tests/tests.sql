@@ -74,6 +74,8 @@ select t.ok((select discount_min = 5 and commission_rate = 5 and launch_slots = 
 select t.ok(norm('Méchoui ÉPICÉ') = 'mechoui epice', 'Recherche sans accents');
 select t.ok(round(distance_km(48.8566, 2.3522, 48.9362, 2.3574)::numeric, 1) between 8.7 and 8.9, 'Distance Paris - Saint-Denis ≈ 8,8 km');
 
+-- Bienvenue désactivée pour les tests historiques (testée plus bas)
+update settings set welcome_enabled = false;
 set role authenticated;
 
 -- ---------- Fondateur ----------
@@ -484,6 +486,102 @@ select t.ok((select (x->>'shops')::int from jsonb_array_elements(:'mb'::jsonb->'
             'Commerces par département');
 select t.login(:'m1');
 select t.throws($$select admin_members()$$, 'NOT_ADMIN', 'Nombre d''inscrits réservé au fondateur');
+
+-- ---------- Offre de bienvenue (payée par Souki Deals) ----------
+reset role;
+insert into auth.users (id, email, email_confirmed_at) values
+  ('bbbbbbbb-0000-0000-0000-000000000031', 'nouveau1@test.fr', now()),
+  ('bbbbbbbb-0000-0000-0000-000000000032', 'nouveau2@test.fr', now()),
+  ('bbbbbbbb-0000-0000-0000-000000000033', 'nouveau3@test.fr', now());
+insert into profiles (id, full_name, phone) values
+  ('bbbbbbbb-0000-0000-0000-000000000031', 'Samir N.', '06 11 22 33 44'),
+  ('bbbbbbbb-0000-0000-0000-000000000032', 'Samir bis', '0611223344'),
+  ('bbbbbbbb-0000-0000-0000-000000000033', 'Nora K.', null);
+update purchases set status = 'confirmed' where status = 'pending';
+set role authenticated;
+select t.login(:'admin');
+select admin_update_welcome(true, 1000, 3000, 2);
+select t.ok((admin_promo_stats()->>'welcome_used')::int = 0, 'Bienvenue : aucune utilisée');
+select t.throws($$select admin_update_welcome(true, 99999, 3000, 2)$$, 'BAD_SETTINGS', 'Bienvenue : montant trop élevé refusé');
+select t.login('bbbbbbbb-0000-0000-0000-000000000031');
+select t.ok((client_welcome()->>'amount_cents')::int = 1000 and (client_welcome()->>'min_cents')::int = 3000, 'Nouveau client : -10 € dès 30 €');
+select code as wcode from create_voucher(:'m2shop') \gset
+select t.login(:'m2');
+select t.ok((merchant_voucher_info(:'wcode')->>'welcome_cents')::int = 1000, 'En caisse : le commerçant voit les 10 € à déduire');
+select merchant_scan(:'wcode', 1500) as w1 \gset
+select t.ok((:'w1'::jsonb->>'welcome_cents')::int = 0, 'Achat trop petit (15 € + 10 € < 30 €) : pas de bienvenue');
+reset role;
+delete from purchases where (:'w1'::jsonb->>'purchase_id')::uuid = id;
+update vouchers set status = 'active' where code = :'wcode';
+set role authenticated;
+select merchant_scan(:'wcode', 2500) as w2 \gset
+select t.ok((:'w2'::jsonb->>'welcome_cents')::int = 1000 and (:'w2'::jsonb->>'commission_cents')::int = 175,
+            'Achat de 25 € payés + 10 € de bienvenue : commission sur 35 € = 1,75 €');
+select t.login('bbbbbbbb-0000-0000-0000-000000000031');
+select t.ok((client_welcome()->>'amount_cents')::int = 0, 'Bienvenue : une seule fois par client');
+select t.login('bbbbbbbb-0000-0000-0000-000000000032');
+select t.ok((client_welcome()->>'amount_cents')::int = 0, 'Même numéro de téléphone : pas de deuxième bienvenue');
+select t.login('bbbbbbbb-0000-0000-0000-000000000033');
+select t.ok((client_welcome()->>'amount_cents')::int = 1000, 'Autre client : bienvenue disponible');
+select code as wcode3 from create_voucher(:'m2shop') \gset
+select t.login(:'m2');
+select merchant_scan(:'wcode3', 4000);
+select t.login('bbbbbbbb-0000-0000-0000-000000000033');
+select t.ok((client_welcome()->>'amount_cents')::int = 0, 'Après usage : plus de bienvenue');
+select t.login(:'admin');
+select t.ok((admin_promo_stats()->>'welcome_used')::int = 2 and (admin_promo_stats()->>'welcome_cost_cents')::int = 2000, 'Fondateur : 2 bienvenues, 20 € de coût');
+select admin_update_welcome(true, 1000, 3000, 2);
+reset role;
+insert into auth.users (id, email, email_confirmed_at) values ('bbbbbbbb-0000-0000-0000-000000000034', 'nouveau4@test.fr', now());
+set role authenticated;
+select t.login('bbbbbbbb-0000-0000-0000-000000000034');
+select t.ok((client_welcome()->>'amount_cents')::int = 0, 'Places de bienvenue épuisées : offre arrêtée');
+select t.login(:'m2');
+select t.ok((merchant_stats()->>'welcome_credit_cents')::int = 0, 'Achats en attente de confirmation : rien à rembourser encore');
+-- Prélèvement : commission − bienvenue ; en faveur du commerçant si négatif
+reset role;
+update purchases set status = 'confirmed', week_start = week_of(now()) where welcome_cents > 0 or (status = 'pending' and shop_id = :'m2shop');
+delete from charges where shop_id = :'m2shop' and status = 'pending';
+update shops set free_until = paris_today() + 30 where id = :'m2shop';
+update purchases set free = true, week_start = week_of(now()) where shop_id = :'m2shop' and charge_id is null and status = 'confirmed';
+select close_week(week_of(now()));
+select t.ok((select amount_cents = -2000 and welcome_cents = 2000 and commission_cents = 0 from charges
+             where shop_id = :'m2shop' and status = 'pending' and amount_cents < 0),
+            'Offre de lancement + 2 bienvenues : Souki Deals doit 20 € au commerçant');
+set role authenticated;
+select t.login(:'c1');
+select t.ok(shop_is_visible(:'m2shop') and not shop_is_blocked(:'m2shop'), 'Remboursement dû : le commerce reste visible');
+select t.login(:'admin');
+select t.ok((admin_promo_stats()->>'refunds_due_cents')::int = 2000, 'Fondateur : 20 € à rembourser');
+select admin_set_charge_status((select id from charges where shop_id = :'m2shop' and amount_cents < 0), 'paid');
+select t.ok(not exists (select 1 from invoices where charge_id = (select id from charges where shop_id = :'m2shop' and amount_cents < 0)),
+            'Remboursement sans commission : pas de facture');
+select admin_update_welcome(false, 1000, 3000, 100);
+
+-- ---------- Promos du commerçant ----------
+select t.login(:'m1');
+select t.throws($$select merchant_save_promo('flash', 'Gigot', 5, null, 0)$$, 'BAD_PROMO', 'Offre flash : pas moins que la remise du commerce');
+select t.throws($$select merchant_save_promo('flash', 'Gigot', 30, null, 9)$$, 'BAD_PROMO', 'Offre flash : 7 jours au plus');
+select t.throws($$select merchant_save_promo('gift', 'Pain', null, 50, 3)$$, 'BAD_PROMO', 'Produit offert : montant minimum vérifié');
+select merchant_save_promo('flash', 'Gigot d''agneau', 20, null, 0) as pr1 \gset
+select merchant_save_promo('gift', 'Pain', null, 2000, 7);
+select t.ok((select count(*) from promos where shop_id = :'m1shop' and active) = 2
+            and (select ends_at = ((paris_today() + 1)::timestamp at time zone 'Europe/Paris') from promos where id = :'pr1'),
+            'Promos créées ; l''offre flash finit ce soir à minuit');
+select merchant_save_promo('flash', 'Merguez', 15, null, 1);
+select t.throws($$select merchant_save_promo('flash', 'Poulet', 15, null, 0)$$, 'TOO_MANY', '3 promos au plus');
+select t.login(:'c1');
+select t.ok((select count(*) from active_promos(48.93, 2.35, 10) where shop_id = :'m1shop') = 3
+            and (select kind from active_promos(48.93, 2.35, 10) limit 1) = 'flash', 'Le client voit les promos autour de lui, flash d''abord');
+select t.ok((select count(*) from active_promos(43.3, 5.4, 10)) = 0, 'Trop loin : aucune promo');
+select t.throws(format($$select merchant_stop_promo(%s)$$, :'pr1'), 'NOT_FOUND', 'Un client n''arrête pas une promo');
+select t.login(:'m1');
+select merchant_stop_promo(:'pr1');
+select t.login(null);
+set role anon;
+select t.ok((select count(*) from active_promos(null, null, null) where id = :'pr1') = 0 and (select count(*) from promos where shop_id = :'m1shop') = 2,
+            'Promo arrêtée : invisible, même sans compte');
+set role authenticated;
 
 -- ---------- Limites ----------
 select t.login(:'admin');

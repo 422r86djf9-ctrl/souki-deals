@@ -23,6 +23,7 @@ export type StatementPurchase = {
   discount_pct: number;
   discount_cents: number;
   commission_cents: number;
+  welcome_cents?: number;
   free: boolean;
   status: 'pending' | 'confirmed' | 'disputed';
   invoice: string | null;
@@ -54,6 +55,7 @@ export type Statement = {
   months: StatementMonth[];
   unbilled_cents: number;
   offered_cents: number;
+  welcome_cents?: number;
 };
 
 const MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
@@ -155,6 +157,7 @@ export function statementHtml(s: Statement): string {
     <div class="kpi">Factures<b>${t.invoices}</b></div>
     <div class="kpi">Ventes amenées (${t.purchases} achats)<b>${eur(t.sales)}</b></div>
     <div class="kpi">Remises accordées aux clients<b>${eur(t.discounts)}</b></div>
+    ${s.welcome_cents ? `<div class="kpi">Offres de bienvenue remboursées par Souki Deals<b>${eur(s.welcome_cents)}</b></div>` : ''}
   </div>
   ${s.offered_cents > 0 ? `<p class="muted">Commission offerte (offre de lancement) : ${eur(s.offered_cents)} — non facturée.</p>` : ''}
   ${s.unbilled_cents > 0 ? `<p class="muted">Commission de ${s.year} pas encore prélevée à la date du relevé : ${eur(s.unbilled_cents)} (facturée au prochain prélèvement).</p>` : ''}
@@ -175,6 +178,7 @@ export function statementHtml(s: Statement): string {
   <div class="note"><b>Pour le comptable</b><br>
     Les commissions Souki Deals sont des charges (compte 622 « Rémunérations d'intermédiaires », par exemple 6222 « Commissions et courtages »), justifiées par les factures ci-dessus, payées par carte bancaire.
     Les remises clients sont déjà déduites des montants encaissés : elles ne demandent pas d'écriture supplémentaire.
+    Les offres de bienvenue (montant déduit en caisse puis remboursé par Souki Deals) complètent le chiffre d'affaires encaissé ; elles sont déduites des commissions prélevées.
     Le détail des achats et des factures est fourni en fichiers Excel (CSV).</div>
 </body></html>`;
 }
@@ -210,13 +214,14 @@ export function invoicesCsv(s: Statement): string {
 export function purchasesCsv(s: Statement): string {
   const status = (x: StatementPurchase['status']) => (x === 'confirmed' ? 'Confirmé' : x === 'disputed' ? 'Contesté' : 'En attente du client');
   return csv([
-    ['Date', 'Heure', 'Montant payé (€)', 'Remise (%)', 'Remise accordée (€)', 'Commission (€)', 'Commission offerte', 'Statut', 'Facture'],
+    ['Date', 'Heure', 'Montant payé (€)', 'Remise (%)', 'Remise accordée (€)', 'Bienvenue remboursée par Souki Deals (€)', 'Commission (€)', 'Commission offerte', 'Statut', 'Facture'],
     ...s.purchases.map((p) => [
       d(p.date),
       hm(p.date),
       num(p.amount_cents),
       String(Number(p.discount_pct)).replace('.', ','),
       num(p.discount_cents),
+      num(p.welcome_cents ?? 0),
       num(p.commission_cents),
       p.free ? 'Oui' : 'Non',
       status(p.status),

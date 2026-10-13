@@ -40,6 +40,8 @@ type Invoice = {
   vat_rate: number;
   vat_cents: number;
   amount_ttc_cents: number;
+  welcome_cents?: number | null;
+  net_cents?: number | null;
   seller: Party;
   buyer: Party;
   email_to: string | null;
@@ -207,6 +209,19 @@ async function buildPdf(inv: Invoice): Promise<Uint8Array> {
     y -= 16;
   }
 
+  // Offres de bienvenue Souki Deals remboursées au commerçant, déduites du paiement
+  const welcome = Number(inv.welcome_cents ?? 0);
+  if (welcome > 0) {
+    const net = Number(inv.net_cents ?? inv.amount_ttc_cents - welcome);
+    y -= 4;
+    text('Bienvenues remboursées', 340, y, { size: 9 });
+    right(`-${euros(welcome)}`, R - 8, y, { size: 9 });
+    y -= 14;
+    text(net >= 0 ? 'Montant prélevé' : 'Montant versé au client', 340, y, { size: 9, f: bold });
+    right(euros(Math.abs(net)), R - 8, y, { size: 9, f: bold });
+    y -= 16;
+  }
+
   // Tampon « acquittée »
   y -= 8;
   page.drawRectangle({ x: L, y: y - 8, width: 150, height: 26, borderColor: SAFRAN, borderWidth: 1.5 });
@@ -253,7 +268,8 @@ function emailHtml(inv: Invoice): string {
     <table style="border-collapse:collapse;width:100%;margin:12px 0">
       <tr><td style="padding:6px 0;color:#666">Période</td><td style="text-align:right">du ${dateFr(inv.period_start)} au ${dateFr(inv.period_end)}</td></tr>
       <tr><td style="padding:6px 0;color:#666">Ventes amenées</td><td style="text-align:right">${inv.purchases_count} achat(s) · ${euros(inv.sales_cents)}</td></tr>
-      <tr><td style="padding:6px 0;color:#666">Commission payée (TTC)</td><td style="text-align:right;font-weight:bold">${euros(inv.amount_ttc_cents)}</td></tr>
+      <tr><td style="padding:6px 0;color:#666">Commission (TTC)</td><td style="text-align:right;font-weight:bold">${euros(inv.amount_ttc_cents)}</td></tr>
+      ${Number(inv.welcome_cents ?? 0) > 0 ? `<tr><td style="padding:6px 0;color:#666">Offres de bienvenue remboursées</td><td style="text-align:right">-${euros(Number(inv.welcome_cents))}</td></tr>` : ''}
     </table>
     <p>Vos factures restent disponibles dans l'application : <b>Mon commerce &gt; Mes factures</b>.</p>
     <p style="color:#666;font-size:12px">${esc([inv.seller.legal_name, inv.seller.address].filter(Boolean).join(' · '))}</p>

@@ -19,6 +19,7 @@ export default function Inscription() {
   const [commission, setCommission] = useState(5);
   const [freeMonths, setFreeMonths] = useState(3);
   const [launchSlots, setLaunchSlots] = useState(150);
+  const [welcome, setWelcome] = useState<{ a: number; m: number }>({ a: 1000, m: 3000 });
   const [slotsLeft, setSlotsLeft] = useState<number | null>(null);
   const [accepted, setAccepted] = useState(false);
 
@@ -40,7 +41,7 @@ export default function Inscription() {
         const { data: u } = await supabase.auth.getUser();
         const [z, st, slots, mine] = await Promise.all([
           supabase.from('zones').select('id, name, name_en, name_ar, open, sort').order('sort'),
-          supabase.from('settings').select('discount_min, commission_rate, launch_free_months, launch_slots').eq('id', 1).single(),
+          supabase.from('settings').select('discount_min, commission_rate, launch_free_months, launch_slots, welcome_amount_cents, welcome_min_cents').eq('id', 1).single(),
           supabase.rpc('launch_slots_left'),
           supabase
             .from('shops')
@@ -54,6 +55,7 @@ export default function Inscription() {
           setCommission(Number(st.data.commission_rate));
           setFreeMonths(Number(st.data.launch_free_months));
           setLaunchSlots(Number(st.data.launch_slots));
+          setWelcome({ a: Number(st.data.welcome_amount_cents ?? 1000), m: Number(st.data.welcome_min_cents ?? 3000) });
         }
         setSlotsLeft(typeof slots.data === 'number' ? slots.data : null);
         const s = mine.data;
@@ -179,7 +181,7 @@ export default function Inscription() {
             accessibilityRole="button"
             hitSlop={8}
             onPress={() =>
-              shareConditionsPdf({ discountMin: minDiscount, commission, launchSlots, launchMonths: freeMonths }).catch(() =>
+              shareConditionsPdf({ discountMin: minDiscount, commission, launchSlots, launchMonths: freeMonths, welcomeCents: welcome.a, welcomeMinCents: welcome.m }).catch(() =>
                 setError(t('Impossible de préparer le fichier.')),
               )
             }

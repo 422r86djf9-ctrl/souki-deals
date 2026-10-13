@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { euros, finalCents, Kind, kindLabel, openDirections, Product, unitLabel } from '../../src/lib/deals';
 import { t } from '../../src/lib/i18n';
+import { Promo, promoLabel, promoUntil } from '../../src/lib/promos';
 import { errorMessage, supabase } from '../../src/lib/supabase';
 import { Button, Chip, colors, DiscountTag, ErrorText, InfoText, Muted, SectionTitle, styles } from '../../src/lib/theme';
 
@@ -25,6 +26,7 @@ export default function Commerce() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [shop, setShop] = useState<Shop | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  const [promos, setPromos] = useState<Promo[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -36,7 +38,7 @@ export default function Commerce() {
   useEffect(() => {
     (async () => {
       try {
-        const [s, p] = await Promise.all([
+        const [s, p, pr] = await Promise.all([
           supabase.from('shops').select('id, name, kind, address, lat, lng, phone, halal_cert, hours, description, discount_pct').eq('id', id).maybeSingle(),
           supabase
             .from('products')
@@ -45,11 +47,19 @@ export default function Commerce() {
             .eq('active', true)
             .order('category')
             .order('name'),
+          supabase
+            .from('promos')
+            .select('id, shop_id, kind, title, discount_pct, min_cents, ends_at')
+            .eq('shop_id', id)
+            .eq('active', true)
+            .gt('ends_at', new Date().toISOString())
+            .order('kind'),
         ]);
         if (s.error) throw s.error;
         if (p.error) throw p.error;
         setShop(s.data as Shop | null);
         setProducts((p.data ?? []) as Product[]);
+        setPromos((pr.data ?? []) as Promo[]);
       } catch (e) {
         setError(errorMessage(e));
       } finally {
@@ -112,6 +122,14 @@ export default function Commerce() {
         </View>
       </View>
 
+      {promos.map((p) => (
+        <View key={p.id} style={[styles.card, { borderColor: colors.saffron, borderWidth: 2 }]}>
+          <Text style={{ fontSize: 13, fontWeight: '800', color: p.kind === 'flash' ? colors.saffronDark : colors.prune }}>
+            {`${p.kind === 'flash' ? t('OFFRE FLASH') : t('CADEAU')} · ${promoUntil(p)}`}
+          </Text>
+          <Text style={{ fontSize: 17, fontWeight: '900', color: colors.text, marginTop: 2 }}>{promoLabel(p)}</Text>
+        </View>
+      ))}
       <Button title={t('Je suis dans le magasin : scanner son QR code')} variant="accent" onPress={() => router.push('/entree')} />
       <Button title={t('Obtenir mon bon de réduction')} variant="secondary" onPress={getVoucher} loading={busy} />
       <Muted>{t('Montrez le QR code en caisse : la remise est appliquée sur votre ticket.')}</Muted>

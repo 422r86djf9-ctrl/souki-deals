@@ -1,13 +1,24 @@
 // Administration (fondateur uniquement)
 import { Stack, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
-import { euros, fullDate, Invoice, invoiceEmailLabel, kindLabel, shortDate, Zone } from '../src/lib/deals';
+import { ActivityIndicator, Alert, Linking, Pressable, RefreshControl, ScrollView, Switch, Text, View } from 'react-native';
+import { euros, fullDate, Invoice, invoiceEmailLabel, kindLabel, parseEuros, shortDate, Zone } from '../src/lib/deals';
 import { t, zoneLabel } from '../src/lib/i18n';
 import { errorMessage, supabase, whoami } from '../src/lib/supabase';
 import { Button, Chip, colors, ErrorText, Field, InfoText, Muted, SectionTitle, styles } from '../src/lib/theme';
 
 type Tab = 'summary' | 'members' | 'shops' | 'scores' | 'disputes' | 'charges' | 'invoices' | 'reports' | 'settings';
+type PromoStats = {
+  welcome_enabled: boolean;
+  welcome_amount_cents: number;
+  welcome_min_cents: number;
+  welcome_slots: number;
+  welcome_used: number;
+  welcome_cost_cents: number;
+  welcome_cost_month_cents: number;
+  refunds_due_cents: number;
+  promos_active: number;
+};
 type Members = {
   clients: { total: number; today: number; week: number; month: number; active_30d: number; unconfirmed: number };
   shops: { total: number; active: number; pending: number; suspended: number; week: number; month: number; launch_offer: number };
@@ -111,6 +122,8 @@ export default function Admin() {
   const [invoices, setInvoices] = useState<AdminInvoice[]>([]);
   const [scores, setScores] = useState<Score[]>([]);
   const [members, setMembers] = useState<Members | null>(null);
+  const [promoStats, setPromoStats] = useState<PromoStats | null>(null);
+  const [wForm, setWForm] = useState<{ on: boolean; amount: string; min: string; slots: string } | null>(null);
   const [company, setCompany] = useState<Record<CKey, string> | null>(null);
 
   const load = useCallback(async () => {
@@ -121,7 +134,7 @@ export default function Admin() {
         router.back();
         return;
       }
-      const [s, sh, d, c, r, z, st, inv, co, sc, mb] = await Promise.all([
+      const [s, sh, d, c, r, z, st, inv, co, sc, mb, ps] = await Promise.all([
         supabase.rpc('admin_summary'),
         supabase
           .from('shops')
@@ -141,6 +154,7 @@ export default function Admin() {
         supabase.from('company').select('*').eq('id', 1).maybeSingle(),
         supabase.rpc('admin_shop_scores'),
         supabase.rpc('admin_members'),
+        supabase.rpc('admin_promo_stats'),
       ]);
       if (s.error) throw s.error;
       setSummary(s.data as Summary);
@@ -165,6 +179,18 @@ export default function Admin() {
       setInvoices((inv.data ?? []) as AdminInvoice[]);
       setScores((sc.data ?? []) as Score[]);
       setMembers((mb.data ?? null) as Members | null);
+      const pst = (ps.data ?? null) as PromoStats | null;
+      setPromoStats(pst);
+      if (pst)
+        setWForm(
+          (prev) =>
+            prev ?? {
+              on: pst.welcome_enabled,
+              amount: (pst.welcome_amount_cents / 100).toString().replace('.', ','),
+              min: (pst.welcome_min_cents / 100).toString().replace('.', ','),
+              slots: String(pst.welcome_slots),
+            },
+        );
       if (co.data) {
         const f = {} as Record<CKey, string>;
         for (const k of COMPANY_FIELDS) {
@@ -262,6 +288,22 @@ export default function Admin() {
     });
   }
 
+  async function saveWelcome() {
+    if (!wForm) return;
+    const a = parseEuros(wForm.amount);
+    const m = wForm.min.trim() === '0' ? 0 : parseEuros(wForm.min);
+    const sl = Number(wForm.slots);
+    if (!a || m == null || !Number.isInteger(sl) || sl < 0) return setError(t('Valeurs invalides : vérifiez les paramètres.'));
+    setBusy(true);
+    setError('');
+    const { error } = await supabase.rpc('admin_update_welcome', { p_enabled: wForm.on, p_amount_cents: a, p_min_cents: m, p_slots: sl });
+    setBusy(false);
+    if (error) return setError(errorMessage(error));
+    setInfo(t('Offre de bienvenue enregistrée.'));
+    setWForm(null);
+    await load();
+  }
+
   async function openInvoice(i: Invoice) {
     setError('');
     if (!i.pdf_path) return setInfo(t('Le PDF de cette facture est en préparation. Réessayez dans quelques minutes.'));
@@ -325,6 +367,10 @@ export default function Admin() {
             [t('Particuliers inscrits'), String(members?.clients.total ?? '–')],
             [t('Commerçants inscrits'), String(members?.shops.total ?? '–')],
             [t('À prélever ou refusé'), euros(summary.charges_pending_cents)],
+            [t('Bienvenues utilisées'), promoStats ? `${promoStats.welcome_used} / ${promoStats.welcome_slots}` : '–'],
+            [t('Coût des bienvenues ce mois-ci'), euros(promoStats?.welcome_cost_month_cents ?? 0)],
+            [t('À rembourser aux commerçants'), euros(promoStats?.refunds_due_cents ?? 0)],
+            [t('Promos des commerçants en cours'), String(promoStats?.promos_active ?? 0)],
             [t('Factures émises ce mois-ci'), String(summary.invoices_month ?? 0)],
             [t('Paiements sans facture'), String(summary.invoices_missing ?? 0)],
             [t('Factures non envoyées'), String(summary.invoices_failed ?? 0)],
@@ -517,8 +563,9 @@ export default function Admin() {
             <View key={c.id} style={styles.card}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text, flex: 1 }}>{c.shops?.name ?? ''}</Text>
-                <Text style={{ fontSize: 16, fontWeight: '900', color: colors.prune }}>{euros(c.amount_cents)}</Text>
+                <Text style={{ fontSize: 16, fontWeight: '900', color: c.amount_cents < 0 ? colors.success : colors.prune }}>{euros(c.amount_cents)}</Text>
               </View>
+              {c.amount_cents < 0 ? <Muted>{t('Souki Deals doit cette somme au commerçant (offres de bienvenue) : faites le virement puis marquez « Payé ».')}</Muted> : null}
               <Muted>{`${t('Semaine du {date}', { date: shortDate(c.week_start) })} · ${
                 c.status === 'paid' ? t('Payé') : c.status === 'failed' ? t('Refusé') : c.status === 'waived' ? t('Offert') : t('À prélever')
               }`}</Muted>
@@ -622,6 +669,24 @@ export default function Admin() {
               ))
             : null}
           <Button title={t('Enregistrer les réglages')} onPress={saveSettings} loading={busy} />
+          <SectionTitle>{t('Offre de bienvenue (payée par Souki Deals)')}</SectionTitle>
+          {wForm ? (
+            <>
+              <View style={[styles.card, { flexDirection: 'row', alignItems: 'center' }]}>
+                <Text style={{ flex: 1, color: colors.text, fontWeight: '700' }}>{wForm.on ? t('Offre active') : t('Offre arrêtée')}</Text>
+                <Switch value={wForm.on} onValueChange={(v) => setWForm({ ...wForm, on: v })} trackColor={{ true: colors.prune, false: colors.border }} thumbColor="#FFFFFF" />
+              </View>
+              <Field label={t('Montant offert (€)')} value={wForm.amount} onChangeText={(v) => setWForm({ ...wForm, amount: v.replace(/[^0-9.,]/g, '') })} keyboardType="decimal-pad" maxLength={6} />
+              <Field label={t('Achat minimum (€)')} value={wForm.min} onChangeText={(v) => setWForm({ ...wForm, min: v.replace(/[^0-9.,]/g, '') })} keyboardType="decimal-pad" maxLength={7} />
+              <Field label={t('Nombre de places (budget)')} value={wForm.slots} onChangeText={(v) => setWForm({ ...wForm, slots: v.replace(/[^0-9]/g, '') })} keyboardType="number-pad" maxLength={6} />
+              {promoStats ? (
+                <Muted>
+                  {t('{u} utilisées sur {s} · coût total {c}', { u: promoStats.welcome_used, s: promoStats.welcome_slots, c: euros(promoStats.welcome_cost_cents) })}
+                </Muted>
+              ) : null}
+              <Button title={t('Enregistrer l’offre de bienvenue')} onPress={saveWelcome} loading={busy} />
+            </>
+          ) : null}
           <SectionTitle>{t('Zones ouvertes aux clients')}</SectionTitle>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
             {zones.map((z) => (

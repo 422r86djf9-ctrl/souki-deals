@@ -13,6 +13,7 @@ type V = { id: string; code: string; expires_at: string; shops: { name: string }
 type P = {
   id: string;
   amount_cents: number;
+  welcome_cents: number;
   discount_pct: number;
   status: 'pending' | 'confirmed' | 'disputed' | 'cancelled';
   created_at: string;
@@ -49,7 +50,7 @@ export default function Achats() {
         .order('created_at', { ascending: false }),
       supabase
         .from('purchases')
-        .select('id, amount_cents, discount_pct, status, created_at, shops(name)')
+        .select('id, amount_cents, welcome_cents, discount_pct, status, created_at, shops(name)')
         .eq('client_id', uid)
         .order('created_at', { ascending: false })
         .limit(100),
@@ -88,7 +89,7 @@ export default function Achats() {
   // Économie estimée : le montant payé est après remise
   const saved = purchases
     .filter((p) => p.status === 'confirmed' || p.status === 'pending')
-    .reduce((s, p) => s + (p.amount_cents * p.discount_pct) / (100 - p.discount_pct), 0);
+    .reduce((s, p) => s + (p.amount_cents * p.discount_pct) / (100 - p.discount_pct) + (p.welcome_cents ?? 0), 0);
 
   return (
     <ScrollView
@@ -132,7 +133,7 @@ export default function Achats() {
       {purchases
         .filter((p) => p.status === 'pending')
         .map((p) => (
-          <PurchaseAnswer key={p.id} id={p.id} amountCents={p.amount_cents} shopName={p.shops?.name ?? ''} onDone={load} />
+          <PurchaseAnswer key={p.id} id={p.id} amountCents={p.amount_cents} welcomeCents={p.welcome_cents} shopName={p.shops?.name ?? ''} onDone={load} />
         ))}
 
       <SectionTitle>{t('Bons en cours')}</SectionTitle>

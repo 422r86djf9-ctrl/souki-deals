@@ -42,6 +42,8 @@ export function translateServerMessage(msg: string): string {
   if (m) return t("La remise doit être d'au moins {n} %.", { n: m[1] });
   m = msg.match(/^Vous avez déjà (\d+) bons en cours : utilisez-en un ou annulez-le\.$/);
   if (m) return t('Vous avez déjà {n} bons en cours : utilisez-en un ou annulez-le.', { n: m[1] });
+  m = msg.match(/^Offre flash : entre 10 % et 90 %, et plus que votre remise de ([\d.,]+) %\.$/);
+  if (m) return t('Offre flash : entre 10 % et 90 %, et plus que votre remise de {n} %.', { n: m[1] });
   m = msg.match(/^Montant invalide \(maximum (\d+) €\)\.$/);
   if (m) return t('Montant invalide (maximum {n} €).', { n: m[1] });
   return t(msg);

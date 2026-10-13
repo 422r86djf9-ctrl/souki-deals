@@ -6,7 +6,7 @@ import { t } from '../lib/i18n';
 import { errorMessage, supabase } from '../lib/supabase';
 import { Button, colors, ErrorText, styles } from '../lib/theme';
 
-export function PurchaseAnswer({ id, amountCents, shopName, onDone }: { id: string; amountCents: number; shopName: string; onDone: () => void }) {
+export function PurchaseAnswer({ id, amountCents, shopName, onDone, welcomeCents = 0 }: { id: string; amountCents: number; shopName: string; onDone: () => void; welcomeCents?: number }) {
   const [disputing, setDisputing] = useState(false);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -27,6 +27,11 @@ export function PurchaseAnswer({ id, amountCents, shopName, onDone }: { id: stri
       <Text style={{ fontSize: 17, fontWeight: '800', color: colors.text }}>
         {t('Vous avez payé {amount} chez {shop} ?', { amount: euros(amountCents), shop: shopName })}
       </Text>
+      {welcomeCents > 0 ? (
+        <Text style={{ color: colors.success, fontWeight: '700', marginTop: 4 }}>
+          {t('Votre bienvenue de {amount} a été déduite : vérifiez-le sur votre ticket.', { amount: euros(welcomeCents) })}
+        </Text>
+      ) : null}
       <ErrorText>{error}</ErrorText>
       {disputing ? (
         <>

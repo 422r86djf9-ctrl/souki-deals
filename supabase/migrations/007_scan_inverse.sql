@@ -224,7 +224,8 @@ begin
 end $$;
 
 -- Commerçant : clients présents (visites en attente)
-create or replace function public.merchant_checkins()
+drop function if exists public.merchant_checkins();
+create function public.merchant_checkins()
 returns table (id uuid, code text, first_name text, created_at timestamptz, expires_at timestamptz)
 language plpgsql stable security definer set search_path = public as $$
 #variable_conflict use_column

@@ -25,6 +25,7 @@ type Stats = {
   card_ok: boolean;
   blocked: boolean;
   discount_pct: number;
+  welcome_credit_cents?: number;
 };
 type Purchase = { id: string; amount_cents: number; commission_cents: number; free: boolean; status: string; created_at: string };
 type Charge = { id: string; week_start: string; amount_cents: number; status: 'pending' | 'paid' | 'failed' | 'waived' };
@@ -181,7 +182,14 @@ export default function Commercant() {
             <Tile label={t('Clients différents')} value={String(stats.clients_count)} />
           </View>
           <View style={styles.card}>
-            <Text style={{ fontWeight: '800', color: colors.text }}>{t('Commission à prélever lundi : {amount}', { amount: euros(stats.commission_due_cents) })}</Text>
+            <Text style={{ fontWeight: '800', color: colors.text }}>
+              {stats.commission_due_cents >= 0
+                ? t('Commission à prélever lundi : {amount}', { amount: euros(stats.commission_due_cents) })
+                : t('Souki Deals vous doit {amount} (offres de bienvenue)', { amount: euros(-stats.commission_due_cents) })}
+            </Text>
+            {stats.welcome_credit_cents ? (
+              <Muted>{t('Dont {amount} d’offres de bienvenue remboursées par Souki Deals.', { amount: euros(stats.welcome_credit_cents) })}</Muted>
+            ) : null}
             <Muted>
               {stats.card_ok
                 ? t('Prélevée automatiquement sur votre carte chaque lundi.')
@@ -189,11 +197,14 @@ export default function Commercant() {
             </Muted>
           </View>
 
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <View style={{ flexGrow: 1, flexBasis: '45%' }}>
               <Button title={t('Mes produits')} variant="secondary" onPress={() => router.push('/commercant/produits')} />
             </View>
-            <View style={{ flex: 1 }}>
+            <View style={{ flexGrow: 1, flexBasis: '45%' }}>
+              <Button title={t('Mes promos')} variant="secondary" onPress={() => router.push('/commercant/promos')} />
+            </View>
+            <View style={{ flexGrow: 1, flexBasis: '45%' }}>
               <Button title={t('Mes informations')} variant="secondary" onPress={() => router.push('/commercant/inscription')} />
             </View>
           </View>
@@ -221,7 +232,11 @@ export default function Commercant() {
               {charges.map((c) => (
                 <View key={c.id} style={[styles.card, { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10 }]}>
                   <Text style={{ color: colors.text }}>{t('Semaine du {date}', { date: shortDate(c.week_start) })}</Text>
-                  <Text style={{ fontWeight: '700', color: c.status === 'failed' ? colors.danger : colors.text }}>{`${euros(c.amount_cents)} · ${chargeLabel(c.status)}`}</Text>
+                  <Text style={{ fontWeight: '700', color: c.status === 'failed' ? colors.danger : c.amount_cents < 0 ? colors.success : colors.text }}>
+                    {c.amount_cents < 0
+                      ? `${t('Remboursement {amount}', { amount: euros(-c.amount_cents) })} · ${c.status === 'paid' ? t('Reçu') : t('À recevoir')}`
+                      : `${euros(c.amount_cents)} · ${chargeLabel(c.status)}`}
+                  </Text>
                 </View>
               ))}
             </>
