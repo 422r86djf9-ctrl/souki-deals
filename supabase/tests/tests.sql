@@ -469,6 +469,22 @@ select t.login(:'c2');
 select t.ok((select count(*) from checkins) = 0, 'Un autre client ne voit pas ces visites');
 select t.throws($$select * from admin_shop_scores()$$, 'NOT_ADMIN', 'Score réservé au fondateur');
 
+-- ---------- Nombre d'inscrits ----------
+select t.login(:'admin');
+select admin_members() as mb \gset
+select t.ok((:'mb'::jsonb->'clients'->>'total')::int = 2 and (:'mb'::jsonb->'clients'->>'active_30d')::int = 2
+            and (:'mb'::jsonb->'clients'->>'unconfirmed')::int = 1,
+            'Inscrits : 2 particuliers vérifiés (sans commerçants ni fondateur), actifs, 1 compte non vérifié');
+select t.ok((:'mb'::jsonb->'shops'->>'total')::int = 2 and (:'mb'::jsonb->'shops'->>'active')::int = 2 and (:'mb'::jsonb->'shops'->>'launch_offer')::int = 2,
+            'Inscrits : 2 commerces actifs avec l''offre de lancement');
+select t.ok(jsonb_array_length(:'mb'::jsonb->'weeks') = 12
+            and (select sum((x->>'clients')::int) from jsonb_array_elements(:'mb'::jsonb->'weeks') x) = 2,
+            'Inscriptions des 12 dernières semaines');
+select t.ok((select (x->>'shops')::int from jsonb_array_elements(:'mb'::jsonb->'by_zone') x where x->>'zone' = 'Seine-Saint-Denis (93)') >= 1,
+            'Commerces par département');
+select t.login(:'m1');
+select t.throws($$select admin_members()$$, 'NOT_ADMIN', 'Nombre d''inscrits réservé au fondateur');
+
 -- ---------- Limites ----------
 select t.login(:'admin');
 select admin_update_settings(5, 5, 24, 1, 120, 50000, 24, 150, 3);

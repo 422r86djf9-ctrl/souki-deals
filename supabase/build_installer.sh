@@ -35,3 +35,11 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
   echo
   echo "commit;"
 } > "$HERE/MISE_A_JOUR_007_SCAN.sql"
+
+{
+  echo "begin;"
+  echo "-- SOUKI DEALS : mise a jour 008 (nombre d'inscrits). N'efface rien, relancable."
+  cat "$HERE/migrations/008_inscrits.sql"
+  echo
+  echo "commit;"
+} > "$HERE/MISE_A_JOUR_008_INSCRITS.sql"

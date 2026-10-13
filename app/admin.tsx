@@ -7,7 +7,14 @@ import { t, zoneLabel } from '../src/lib/i18n';
 import { errorMessage, supabase, whoami } from '../src/lib/supabase';
 import { Button, Chip, colors, ErrorText, Field, InfoText, Muted, SectionTitle, styles } from '../src/lib/theme';
 
-type Tab = 'summary' | 'shops' | 'scores' | 'disputes' | 'charges' | 'invoices' | 'reports' | 'settings';
+type Tab = 'summary' | 'members' | 'shops' | 'scores' | 'disputes' | 'charges' | 'invoices' | 'reports' | 'settings';
+type Members = {
+  clients: { total: number; today: number; week: number; month: number; active_30d: number; unconfirmed: number };
+  shops: { total: number; active: number; pending: number; suspended: number; week: number; month: number; launch_offer: number };
+  by_zone: { zone: string; shops: number; active: number }[];
+  by_kind: { kind: string; shops: number }[];
+  weeks: { week: string; clients: number; shops: number }[];
+};
 type Score = { shop_id: string; name: string; visits: number; done: number; without_amount: number; claimed: number; vouchers: number; vouchers_used: number; done_rate: number | null; level: 'ok' | 'orange' | 'rouge' };
 type Summary = Record<string, number> & { company_ready?: boolean };
 type Company = {
@@ -103,6 +110,7 @@ export default function Admin() {
   const [form, setForm] = useState<Record<SKey, string> | null>(null);
   const [invoices, setInvoices] = useState<AdminInvoice[]>([]);
   const [scores, setScores] = useState<Score[]>([]);
+  const [members, setMembers] = useState<Members | null>(null);
   const [company, setCompany] = useState<Record<CKey, string> | null>(null);
 
   const load = useCallback(async () => {
@@ -113,7 +121,7 @@ export default function Admin() {
         router.back();
         return;
       }
-      const [s, sh, d, c, r, z, st, inv, co, sc] = await Promise.all([
+      const [s, sh, d, c, r, z, st, inv, co, sc, mb] = await Promise.all([
         supabase.rpc('admin_summary'),
         supabase
           .from('shops')
@@ -132,6 +140,7 @@ export default function Admin() {
           .limit(100),
         supabase.from('company').select('*').eq('id', 1).maybeSingle(),
         supabase.rpc('admin_shop_scores'),
+        supabase.rpc('admin_members'),
       ]);
       if (s.error) throw s.error;
       setSummary(s.data as Summary);
@@ -155,6 +164,7 @@ export default function Admin() {
       }
       setInvoices((inv.data ?? []) as AdminInvoice[]);
       setScores((sc.data ?? []) as Score[]);
+      setMembers((mb.data ?? null) as Members | null);
       if (co.data) {
         const f = {} as Record<CKey, string>;
         for (const k of COMPANY_FIELDS) {
@@ -286,6 +296,7 @@ export default function Admin() {
       <Stack.Screen options={{ title: t('Administration') }} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
         <Chip label={t('Résumé')} selected={tab === 'summary'} onPress={() => setTab('summary')} />
+        <Chip label={t('Inscrits')} selected={tab === 'members'} onPress={() => setTab('members')} />
         <Chip label={pendingShops ? t('Commerces ({n} à valider)', { n: pendingShops }) : t('Commerces')} selected={tab === 'shops'} onPress={() => setTab('shops')} />
         <Chip label={suspicious ? t('Méfiance ({n})', { n: suspicious }) : t('Méfiance')} selected={tab === 'scores'} onPress={() => setTab('scores')} />
         <Chip label={t('Contestations ({n})', { n: disputes.length })} selected={tab === 'disputes'} onPress={() => setTab('disputes')} />
@@ -311,7 +322,8 @@ export default function Admin() {
             [t('Commerces à valider'), String(summary.shops_pending)],
             [t('Places de lancement restantes'), String(summary.launch_slots_left)],
             [t('Bons en cours'), String(summary.vouchers_active)],
-            [t('Utilisateurs'), String(summary.users_count)],
+            [t('Particuliers inscrits'), String(members?.clients.total ?? '–')],
+            [t('Commerçants inscrits'), String(members?.shops.total ?? '–')],
             [t('À prélever ou refusé'), euros(summary.charges_pending_cents)],
             [t('Factures émises ce mois-ci'), String(summary.invoices_month ?? 0)],
             [t('Paiements sans facture'), String(summary.invoices_missing ?? 0)],
@@ -370,6 +382,84 @@ export default function Admin() {
               </View>
             );
           })}
+        </View>
+      ) : null}
+
+      {tab === 'members' && members ? (
+        <View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={[styles.card, { flex: 1 }]}>
+              <Text style={{ fontSize: 30, fontWeight: '900', color: colors.prune }}>{members.clients.total}</Text>
+              <Text style={{ color: colors.text, fontWeight: '700' }}>{t('Particuliers inscrits')}</Text>
+              <Muted>{t('{n} actifs sur 30 jours', { n: members.clients.active_30d })}</Muted>
+            </View>
+            <View style={[styles.card, { flex: 1 }]}>
+              <Text style={{ fontSize: 30, fontWeight: '900', color: colors.prune }}>{members.shops.total}</Text>
+              <Text style={{ color: colors.text, fontWeight: '700' }}>{t('Commerçants inscrits')}</Text>
+              <Muted>{t('{a} actifs · {p} à valider', { a: members.shops.active, p: members.shops.pending })}</Muted>
+            </View>
+          </View>
+          {[
+            [t('Nouveaux particuliers aujourd’hui'), members.clients.today],
+            [t('Nouveaux particuliers cette semaine'), members.clients.week],
+            [t('Nouveaux particuliers ce mois-ci'), members.clients.month],
+            [t('Nouveaux commerçants cette semaine'), members.shops.week],
+            [t('Nouveaux commerçants ce mois-ci'), members.shops.month],
+            [t('Commerces avec l’offre de lancement'), members.shops.launch_offer],
+            [t('Commerces suspendus'), members.shops.suspended],
+            [t('Comptes pas encore confirmés (e-mail)'), members.clients.unconfirmed],
+          ].map(([label, value]) => (
+            <View key={String(label)} style={[styles.card, { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10 }]}>
+              <Text style={{ color: colors.text, flex: 1 }}>{label}</Text>
+              <Text style={{ fontWeight: '900', color: colors.prune }}>{String(value)}</Text>
+            </View>
+          ))}
+
+          <SectionTitle>{t('Inscriptions des 12 dernières semaines')}</SectionTitle>
+          <View style={styles.card}>
+            {(() => {
+              const max = Math.max(1, ...members.weeks.map((w) => Math.max(w.clients, w.shops)));
+              return members.weeks
+                .slice()
+                .reverse()
+                .map((w) => (
+                  <View key={w.week} style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 3 }}>
+                    <Text style={{ width: 48, color: colors.muted, fontSize: 12 }}>{shortDate(w.week)}</Text>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <View style={{ height: 8, borderRadius: 4, backgroundColor: colors.prune, width: `${(w.clients / max) * 85}%`, minWidth: w.clients ? 4 : 0 }} />
+                        <Text style={{ fontSize: 11, color: colors.text, marginLeft: 4 }}>{w.clients}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                        <View style={{ height: 8, borderRadius: 4, backgroundColor: colors.saffron, width: `${(w.shops / max) * 85}%`, minWidth: w.shops ? 4 : 0 }} />
+                        <Text style={{ fontSize: 11, color: colors.text, marginLeft: 4 }}>{w.shops}</Text>
+                      </View>
+                    </View>
+                  </View>
+                ));
+            })()}
+            <View style={{ flexDirection: 'row', gap: 14, marginTop: 8 }}>
+              <Text style={{ color: colors.prune, fontWeight: '700', fontSize: 12 }}>{`■ ${t('Particuliers')}`}</Text>
+              <Text style={{ color: colors.saffronDark, fontWeight: '700', fontSize: 12 }}>{`■ ${t('Commerçants')}`}</Text>
+            </View>
+          </View>
+
+          <SectionTitle>{t('Commerces par département')}</SectionTitle>
+          {members.by_zone.length === 0 ? <Muted>{t('Aucun commerce inscrit.')}</Muted> : null}
+          {members.by_zone.map((z) => (
+            <View key={z.zone} style={[styles.card, { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10 }]}>
+              <Text style={{ color: colors.text, flex: 1 }}>{z.zone}</Text>
+              <Text style={{ fontWeight: '800', color: colors.prune }}>{t('{n} ({a} actifs)', { n: z.shops, a: z.active })}</Text>
+            </View>
+          ))}
+
+          <SectionTitle>{t('Commerces par type')}</SectionTitle>
+          {members.by_kind.map((k) => (
+            <View key={k.kind} style={[styles.card, { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10 }]}>
+              <Text style={{ color: colors.text, flex: 1 }}>{kindLabel(k.kind)}</Text>
+              <Text style={{ fontWeight: '800', color: colors.prune }}>{String(k.shops)}</Text>
+            </View>
+          ))}
         </View>
       ) : null}
 

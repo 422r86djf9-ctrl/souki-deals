@@ -51,7 +51,7 @@ begin
       'merchant_resend_invoice', 'current_terms_version', 'merchant_accept_terms', 'merchant_year_statement',
       'new_shop_code', 'purchases_close_checkin', 'first_name', 'client_checkin', 'client_cancel_checkin',
       'client_answer_checkin', 'merchant_checkins', 'merchant_complete_checkin', 'merchant_dismiss_checkin',
-      'admin_shop_scores')
+      'admin_shop_scores', 'admin_members')
   loop
     execute format('drop function if exists %s cascade', r.sig);
   end loop;
