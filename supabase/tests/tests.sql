@@ -742,6 +742,31 @@ select t.ok(exists (select 1 from notifications n join shops s on s.owner_id = n
 select t.ok(not exists (select 1 from notifications where key in ('visit_closed', 'admin_new_shop') and (title is null or body like '%{%')),
             'Textes des notifications complets');
 
+-- ---------- E-mails d'authentification (014) ----------
+reset role;
+select t.ok((public.deals_send_auth_email('{"user":{"email":"a@b.fr"},"email_data":{"email_action_type":"signup","token_hash":"x"}}'::jsonb)->'error'->>'http_code') = '500',
+            'Sans clé Resend : erreur claire');
+insert into vault.decrypted_secrets (name, decrypted_secret) values ('resend_api_key', 're_test');
+delete from net.calls;
+select t.ok(public.deals_send_auth_email('{"user":{"email":"karim@test.fr","user_metadata":{"lang":"fr","espace":"commercant"}},"email_data":{"email_action_type":"signup","token_hash":"abc123","redirect_to":"https://soukideals.com/compte-confirme.html"}}'::jsonb) = '{}'::jsonb,
+            'Inscription commerçant : e-mail envoyé');
+select t.ok((select body->>'subject' = 'Confirmez votre adresse Souki Deals' and body->'to'->>0 = 'karim@test.fr'
+                    and body->>'html' like '%verify?token=abc123&amp;type=signup&amp;redirect_to=https%3A%2F%2Fsoukideals.com%2Fcompte-confirme.html%'
+                    and body->>'html' like '%votre commerce%' and body->>'html' not like '%\%\%URL%'
+             from net.calls where url = 'https://api.resend.com/emails'), 'Lien de confirmation et texte commerçant corrects');
+delete from net.calls;
+select public.deals_send_auth_email('{"user":{"email":"sara@test.fr","user_metadata":{"lang":"ar"}},"email_data":{"email_action_type":"recovery","token_hash":"r1"}}'::jsonb);
+select t.ok((select body->>'html' like '%dir="rtl"%' and body->>'html' like '%type=recovery%' from net.calls), 'Mot de passe oublié en arabe');
+delete from net.calls;
+select public.deals_send_auth_email('{"user":{"email":"old@test.fr","new_email":"new@test.fr"},"email_data":{"email_action_type":"email_change","token_hash":"n1","token_hash_new":"o1"}}'::jsonb);
+select t.ok((select count(*) from net.calls) = 2 and exists (select 1 from net.calls where body->'to'->>0 = 'new@test.fr' and body->>'html' like '%new@test.fr%'),
+            'Changement d''adresse : les deux adresses sont prévenues');
+select t.ok(public.deals_send_auth_email('{"user":{"email":"a@b.fr"},"email_data":{"email_action_type":"reauthentication"}}'::jsonb) = '{}'::jsonb,
+            'Autres cas : rien à envoyer, pas d''erreur');
+select t.ok(not has_function_privilege('authenticated', 'public.deals_send_auth_email(jsonb)', 'execute')
+            and has_function_privilege('supabase_auth_admin', 'public.deals_send_auth_email(jsonb)', 'execute'), 'Seul Supabase Auth appelle le hook');
+delete from vault.decrypted_secrets;
+
 -- ---------- Bilan ----------
 reset role;
 \o

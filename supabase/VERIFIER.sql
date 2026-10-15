@@ -9,6 +9,8 @@ select etape, case when ok then 'OK' else 'MANQUE' end as etat from (values
   ('011 compte et notifications', to_regclass('public.push_tokens') is not null),
   ('012 photos', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'products' and column_name = 'photo_path')),
   ('013 notifications completes', to_regprocedure('public.notify_report()') is not null),
+  ('014 e-mails par Resend', to_regprocedure('public.deals_send_auth_email(jsonb)') is not null),
+  ('cle Resend dans le coffre-fort', exists (select 1 from vault.decrypted_secrets where name = 'resend_api_key')),
   ('stockage photos', exists (select 1 from storage.buckets where id = 'photos')),
   ('extension pg_net', exists (select 1 from pg_extension where extname = 'pg_net')),
   ('taches automatiques', exists (select 1 from pg_extension where extname = 'pg_cron'))

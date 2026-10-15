@@ -39,3 +39,8 @@ create function net.http_post(url text, body jsonb default '{}'::jsonb, params j
 returns bigint language sql as $$
   insert into net.calls (url, body) values (url, body) returning id;
 $$;
+
+-- Simulation : rôle de Supabase Auth et coffre-fort (Vault)
+create role supabase_auth_admin nologin;
+create schema vault;
+create table vault.decrypted_secrets (id uuid primary key default gen_random_uuid(), name text unique, decrypted_secret text);
