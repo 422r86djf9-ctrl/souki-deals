@@ -3,7 +3,7 @@
     "name": "Souki Deals",
     "slug": "souki-deals",
     "scheme": "soukideals",
-    "version": "0.7.0",
+    "version": "0.7.1",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "ios": {
@@ -15,7 +15,7 @@
       "package": "fr.soukideals.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#4A1650"
+        "backgroundColor": "#11903F"
       }
     },
     "plugins": [
