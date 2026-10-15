@@ -127,12 +127,12 @@ export function conditionsHtml(p: TermsParams): string {
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   @page { margin: 18mm 16mm; }
   body { font-family: Helvetica, Arial, sans-serif; color: #1a1a1f; font-size: 10.5pt; line-height: 1.45; }
-  .band { background: #4A1650; color: #fff; padding: 10px 14px; font-weight: bold; font-size: 14pt; }
-  h1 { color: #4A1650; font-size: 18pt; margin: 18px 0 2px; }
+  .band { background: #0E7A35; color: #fff; padding: 10px 14px; font-weight: bold; font-size: 14pt; }
+  h1 { color: #0E7A35; font-size: 18pt; margin: 18px 0 2px; }
   .muted { color: #666; font-size: 9pt; }
-  h2 { color: #4A1650; font-size: 11.5pt; margin: 14px 0 4px; }
+  h2 { color: #0E7A35; font-size: 11.5pt; margin: 14px 0 4px; }
   p { margin: 0 0 6px; }
-  .box { border: 1.5px solid #E89F1C; padding: 10px 12px; margin: 14px 0; font-size: 10pt; }
+  .box { border: 1.5px solid #FF7A1A; padding: 10px 12px; margin: 14px 0; font-size: 10pt; }
 </style></head><body>
   <div class="band">Souki Deals</div>
   <h1>Conditions commerçant</h1>

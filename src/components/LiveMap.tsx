@@ -21,9 +21,9 @@ const HTML = `<!doctype html><html><head>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
- html,body,#map{height:100%;margin:0;background:#FBF8F3}
+ html,body,#map{height:100%;margin:0;background:#F7FAF6}
  .pin{border-radius:50%;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);width:22px;height:22px}
- .shop{background:#4A1650}.me{background:#1E7B4A}.pick{background:#F4A300}
+ .shop{background:#0E7A35}.me{background:#1E7B4A}.pick{background:#FF8A1F}
  .leaflet-control-attribution{font-size:9px}
 </style></head><body><div id="map"></div><script>
  var map=L.map('map',{zoomControl:true}).setView([${PARIS[0]},${PARIS[1]}],12);
@@ -67,7 +67,7 @@ export function LiveMap({ markers, pickMode, onPick, onSelect, style }: Props) {
   useEffect(push, [payload]);
 
   return (
-    <View style={[{ height: 300, borderRadius: 16, overflow: 'hidden', backgroundColor: '#FBF8F3' }, style]}>
+    <View style={[{ height: 300, borderRadius: 16, overflow: 'hidden', backgroundColor: '#F7FAF6' }, style]}>
       <WebView
         ref={ref}
         source={{ html: HTML }}

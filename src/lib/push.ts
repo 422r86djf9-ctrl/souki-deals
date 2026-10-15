@@ -26,7 +26,7 @@ export async function registerForPush(): Promise<void> {
         name: 'Souki Deals',
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#E89F1C',
+        lightColor: '#FF7A1A',
       });
     }
     const current = await Notifications.getPermissionsAsync();

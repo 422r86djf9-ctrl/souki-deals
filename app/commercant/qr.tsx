@@ -33,9 +33,9 @@ function stickerHtml(s: ShopQr): string {
   body { font-family: Helvetica, Arial, sans-serif; margin: 0; }
   .page { display: flex; justify-content: space-around; flex-wrap: wrap; gap: 8mm; }
   .st { width: 100mm; height: 140mm; border: 1px dashed #bbb; border-radius: 6mm; overflow: hidden; text-align: center; }
-  .band { background: #4A1650; color: #fff; font-weight: bold; font-size: 18pt; padding: 4mm 0; }
-  .big { font-size: 20pt; font-weight: 900; color: #4A1650; margin-top: 5mm; }
-  .sub { font-size: 13pt; color: #E89F1C; font-weight: bold; margin: 1mm 0 4mm; }
+  .band { background: #0E7A35; color: #fff; font-weight: bold; font-size: 18pt; padding: 4mm 0; }
+  .big { font-size: 20pt; font-weight: 900; color: #0E7A35; margin-top: 5mm; }
+  .sub { font-size: 13pt; color: #FF7A1A; font-weight: bold; margin: 1mm 0 4mm; }
   .qr { display: flex; justify-content: center; }
   .code { font-size: 18pt; font-weight: 900; letter-spacing: 3px; color: #1a1a1f; margin-top: 3mm; }
   .name { font-size: 11pt; color: #444; margin-top: 1mm; }

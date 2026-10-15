@@ -38,7 +38,7 @@
       [
         "expo-notifications",
         {
-          "color": "#4A1650"
+          "color": "#0E7A35"
         }
       ],
       [
@@ -63,7 +63,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#4A1650"
+      "backgroundColor": "#0E7A35"
     },
     "owner": "sacko-dembas-team",
     "runtimeVersion": {

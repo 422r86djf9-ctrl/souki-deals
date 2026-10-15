@@ -1,20 +1,21 @@
-// Couleurs et composants de base de Souki Deals : prune et safran
+// Couleurs et composants de base de Souki Deals : vert et orange du logo
+// (les noms prune/safran sont gardés pour ne pas toucher tous les écrans : prune = vert, safran = orange)
 import { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
 
 export const colors = {
-  prune: '#4A1650',
-  pruneSoft: '#F2E7F3',
-  saffron: '#F4A300',
-  saffronDark: '#8A5A00', // safran lisible sur fond clair
-  saffronSoft: '#FFF1D6',
-  text: '#2A1630',
-  muted: '#6E5D68',
-  border: '#E6DCE2',
-  background: '#FBF8F3',
+  prune: '#0E7A35',
+  pruneSoft: '#E5F4EA',
+  saffron: '#FF8A1F',
+  saffronDark: '#B04A00', // orange lisible sur fond clair
+  saffronSoft: '#FFEBD6',
+  text: '#1C2A21',
+  muted: '#5B6A60',
+  border: '#DCE6DF',
+  background: '#F7FAF6',
   card: '#FFFFFF',
   danger: '#B3261E',
-  success: '#1E7B4A',
+  success: '#13863F',
 };
 
 export function Title({ children }: { children: ReactNode }) {
@@ -95,14 +96,14 @@ export function DiscountTag({ pct, big }: { pct: number; big?: boolean }) {
   return (
     <View
       style={{
-        backgroundColor: colors.saffron,
+        backgroundColor: '#E8590C',
         borderRadius: 8,
         paddingHorizontal: big ? 12 : 8,
         paddingVertical: big ? 6 : 3,
         alignSelf: 'flex-start',
       }}
     >
-      <Text style={{ color: colors.prune, fontWeight: '900', fontSize: big ? 18 : 13 }}>{`-${Number(pct).toLocaleString('fr-FR')} %`}</Text>
+      <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: big ? 18 : 13 }}>{`-${Number(pct).toLocaleString('fr-FR')} %`}</Text>
     </View>
   );
 }

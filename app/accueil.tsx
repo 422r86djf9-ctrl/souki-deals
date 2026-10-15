@@ -1,6 +1,6 @@
 import { Href, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { euros } from '../src/lib/deals';
 import { registerForPush, unregisterPush, updateMyArea } from '../src/lib/push';
 import { Espace, getEspace, setEspace } from '../src/lib/espace';
@@ -113,6 +113,7 @@ export default function Accueil() {
         />
       }
     >
+      <Image source={require('../assets/logo.png')} style={{ width: 190, height: 56, marginBottom: 10 }} resizeMode="contain" accessibilityLabel="Souki Deals" />
       <Text style={{ fontSize: 26, fontWeight: '800', color: colors.text }}>{t('Bonjour {name}', { name: firstName })}</Text>
       <Muted>{espace === 'commercant' ? t('Espace commerçant') : t('Le halal au meilleur prix, près de chez vous')}</Muted>
       <View style={{ height: 18 }} />

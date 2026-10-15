@@ -49,8 +49,8 @@ type Invoice = {
   pdf_path: string | null;
 };
 
-const PRUNE = rgb(0x4a / 255, 0x16 / 255, 0x50 / 255);
-const SAFRAN = rgb(0xe8 / 255, 0x9f / 255, 0x1c / 255);
+const PRUNE = rgb(0x0e / 255, 0x7a / 255, 0x35 / 255); // vert du logo
+const SAFRAN = rgb(0xff / 255, 0x7a / 255, 0x1a / 255); // orange du logo
 const GRIS = rgb(0.4, 0.4, 0.42);
 const NOIR = rgb(0.1, 0.1, 0.12);
 
@@ -261,7 +261,7 @@ function toBase64(bytes: Uint8Array): string {
 function emailHtml(inv: Invoice): string {
   const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
   return `<div style="font-family:Arial,sans-serif;color:#1a1a1f;max-width:560px">
-  <div style="background:#4A1650;color:#fff;padding:14px 18px;font-weight:bold;font-size:18px">Souki Deals</div>
+  <div style="background:#0E7A35;color:#fff;padding:14px 18px;font-weight:bold;font-size:18px">Souki Deals</div>
   <div style="padding:18px">
     <p>Bonjour ${esc(inv.buyer.name ?? '')},</p>
     <p>Merci pour votre paiement. Vous trouverez ci-joint la facture <b>${esc(inv.number)}</b> de votre commission Souki Deals.</p>

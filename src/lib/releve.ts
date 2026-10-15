@@ -123,21 +123,21 @@ export function statementHtml(s: Statement): string {
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   @page { margin: 14mm 12mm; }
   body { font-family: Helvetica, Arial, sans-serif; color: #1a1a1f; font-size: 9.5pt; }
-  .band { background: #4A1650; color: #fff; padding: 9px 12px; font-weight: bold; font-size: 13pt; }
-  h1 { color: #4A1650; font-size: 17pt; margin: 14px 0 2px; }
-  h2 { color: #4A1650; font-size: 11pt; margin: 16px 0 6px; }
+  .band { background: #0E7A35; color: #fff; padding: 9px 12px; font-weight: bold; font-size: 13pt; }
+  h1 { color: #0E7A35; font-size: 17pt; margin: 14px 0 2px; }
+  h2 { color: #0E7A35; font-size: 11pt; margin: 16px 0 6px; }
   .muted { color: #666; font-size: 8.5pt; }
   .cols { display: flex; gap: 16px; margin-top: 10px; }
   .cols > div { flex: 1; border: 1px solid #ddd; padding: 8px 10px; }
   .kpis { display: flex; flex-wrap: wrap; gap: 8px; }
-  .kpi { flex: 1 1 30%; background: #F5EEF6; padding: 8px 10px; }
-  .kpi b { display: block; font-size: 12.5pt; color: #4A1650; }
+  .kpi { flex: 1 1 30%; background: #E8F5EC; padding: 8px 10px; }
+  .kpi b { display: block; font-size: 12.5pt; color: #0E7A35; }
   table { width: 100%; border-collapse: collapse; }
-  th { background: #4A1650; color: #fff; text-align: left; padding: 5px 6px; font-size: 8.5pt; }
+  th { background: #0E7A35; color: #fff; text-align: left; padding: 5px 6px; font-size: 8.5pt; }
   td { border-bottom: 1px solid #e5e5e5; padding: 4px 6px; }
   .r { text-align: right; }
-  tfoot td { font-weight: bold; border-top: 1.5px solid #4A1650; }
-  .note { border-left: 3px solid #E89F1C; padding: 6px 10px; background: #FDF6EA; margin-top: 12px; }
+  tfoot td { font-weight: bold; border-top: 1.5px solid #0E7A35; }
+  .note { border-left: 3px solid #FF7A1A; padding: 6px 10px; background: #FFF3E8; margin-top: 12px; }
 </style></head><body>
   <div class="band">Souki Deals</div>
   <h1>Relevé annuel ${s.year}</h1>
