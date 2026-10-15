@@ -11,9 +11,11 @@
       "extends": "base",
       "distribution": "internal",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "image": "latest"
       },
-      "channel": "test"
+      "channel": "test",
+      "autoIncrement": true
     },
     "production": {
       "extends": "base",
