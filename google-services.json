@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "920232816686",
+    "project_id": "souki-deals",
+    "storage_bucket": "souki-deals.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:920232816686:android:583e1751a7679aa7672fbf",
+        "android_client_info": {
+          "package_name": "fr.soukideals.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfAZQ0EZBHut_6lDYDIRAtkLkSqy5sWw0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

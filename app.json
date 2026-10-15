@@ -3,7 +3,7 @@
     "name": "Souki Deals",
     "slug": "souki-deals",
     "scheme": "soukideals",
-    "version": "0.7.1",
+    "version": "0.7.2",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "ios": {
@@ -16,7 +16,8 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#11903F"
-      }
+      },
+      "googleServicesFile": "./google-services.json"
     },
     "plugins": [
       "expo-router",
