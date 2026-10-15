@@ -5,7 +5,7 @@ import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, Sc
 import { LanguagePicker } from '../src/components/LanguagePicker';
 import { Espace, getEspace, setEspace } from '../src/lib/espace';
 import { appleAvailable, signInWithApple, signInWithGoogle } from '../src/lib/social';
-import { t } from '../src/lib/i18n';
+import { getLang, t } from '../src/lib/i18n';
 import { errorMessage, supabase } from '../src/lib/supabase';
 import { Button, colors, ErrorText, Field, InfoText, Muted, styles } from '../src/lib/theme';
 
@@ -66,7 +66,12 @@ export default function Connexion() {
         if (error) throw error;
         router.replace('/accueil');
       } else {
-        const { data, error } = await supabase.auth.signUp({ email: mail, password });
+        const { data, error } = await supabase.auth.signUp({
+          email: mail,
+          password,
+          // Pour l'e-mail de confirmation : texte particulier ou commerçant, dans la langue choisie
+          options: { data: { espace: espace ?? 'particulier', lang: getLang() }, emailRedirectTo: 'https://soukideals.com/compte-confirme.html' },
+        });
         if (error) throw error;
         if (data.session) router.replace('/profil');
         else setInfo(t("Compte créé. Ouvrez l'e-mail de confirmation, puis connectez-vous."));
