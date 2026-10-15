@@ -3,7 +3,7 @@
     "name": "Souki Deals",
     "slug": "souki-deals",
     "scheme": "soukideals",
-    "version": "0.6.1",
+    "version": "0.7.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "ios": {
@@ -64,6 +64,14 @@
       "resizeMode": "contain",
       "backgroundColor": "#4A1650"
     },
-    "owner": "sacko-dembas-team"
+    "owner": "sacko-dembas-team",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/ca9a0853-76f5-42ce-bc71-850f008dae6c",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    }
   }
 }

@@ -614,4 +614,7 @@ export const EN: Record<string, string> = {
   'Photo illisible, essayez une autre.': 'Unreadable photo, try another one.',
   'Photo invalide.': 'Invalid photo.',
   'Photo introuvable.': 'Photo not found.',
+  // Version
+  'Version {v} · mise à jour du {d}': 'Version {v} · updated {d}',
+  'Version {v}': 'Version {v}',
 };

@@ -614,4 +614,7 @@ export const AR: Record<string, string> = {
   'Photo illisible, essayez une autre.': 'صورة غير مقروءة، جرّب أخرى.',
   'Photo invalide.': 'صورة غير صالحة.',
   'Photo introuvable.': 'الصورة غير موجودة.',
+  // Version
+  'Version {v} · mise à jour du {d}': 'الإصدار {v} · تحديث {d}',
+  'Version {v}': 'الإصدار {v}',
 };

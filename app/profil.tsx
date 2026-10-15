@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { AppVersion } from '../src/components/AppVersion';
 import { LanguagePicker } from '../src/components/LanguagePicker';
 import { useAuth } from '../src/lib/auth';
 import { unregisterPush } from '../src/lib/push';
@@ -107,6 +108,7 @@ export default function Profil() {
       <Pressable onPress={askDelete} disabled={deleting} accessibilityRole="button" style={{ paddingVertical: 10 }}>
         <Text style={{ color: colors.danger, fontWeight: '700' }}>{deleting ? t('Suppression…') : t('Supprimer mon compte')}</Text>
       </Pressable>
+      <AppVersion />
     </ScrollView>
   );
 }

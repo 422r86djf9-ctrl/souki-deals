@@ -54,3 +54,8 @@ Le halal au meilleur prix, près de chez vous. Appli Android et iPhone (Expo SDK
 - **E-mails** : nom de domaine + Resend branché en SMTP dans Supabase > Authentication > Emails (sinon quelques e-mails de confirmation par heure seulement).
 - **Pages web** : GitHub > souki-deals > Settings > Pages > « Deploy from a branch », `main`, dossier `/docs`.
 
+## Mises à jour à distance (EAS Update, depuis la version 0.7.0)
+- `expo-updates` installé ; `runtimeVersion` = version de `app.json` ; canaux `test` et `production` (eas.json).
+- À chaque envoi sur `main`, le workflow `.eas/workflows/mises-a-jour.yml` publie la mise à jour sur Expo (projet relié à GitHub). Elle arrive sur les téléphones à l'ouverture de l'appli et s'applique à l'ouverture suivante. Le bas de « Mon profil » affiche la date de la dernière mise à jour reçue.
+- **Règle** : ne changer la version de `app.json` que quand un module natif change (nouvelle dépendance expo-…, plugin, permission, icône, nom). Dans ce cas, refaire un build. Pour tout le reste (écrans, textes, calculs), pas de build : l'envoi sur GitHub suffit.
+

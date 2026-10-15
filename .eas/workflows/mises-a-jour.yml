@@ -1,0 +1,21 @@
+# Mise à jour à distance (sans build) à chaque envoi sur main.
+# Elle n'arrive que sur les applis installées avec la même version (runtimeVersion = version de app.json) :
+# changer la version dans app.json UNIQUEMENT quand un module natif change, puis refaire un build.
+name: Mises a jour a distance
+
+on:
+  push:
+    branches: ['main']
+
+jobs:
+  update_test:
+    name: Mise a jour (test)
+    type: update
+    params:
+      channel: test
+      platform: android
+  update_production:
+    name: Mise a jour (production)
+    type: update
+    params:
+      channel: production
