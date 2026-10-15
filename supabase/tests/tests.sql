@@ -724,6 +724,24 @@ select t.ok((admin_summary()->>'shops_active')::int = 2 and (admin_summary()->>'
 select t.login(:'c1');
 select t.throws($$select merchant_stats()$$, 'NO_SHOP', 'Un client n''a pas de tableau de commerçant');
 
+-- ---------- Notifications complètes (013) ----------
+reset role;
+select t.ok(exists (select 1 from notifications where key = 'visit_closed' and body like 'Votre visite chez %'), 'Visite sans montant : le client est prévenu');
+select t.ok(exists (select 1 from notifications where key = 'photo_removed' and body like '%Gigot%'), 'Photo retirée : le commerçant est prévenu');
+select t.ok(exists (select 1 from notifications n where key = 'admin_new_shop' and n.user_id = :'admin'), 'Nouveau commerce : le fondateur est prévenu');
+select t.ok(exists (select 1 from notifications n where key = 'admin_new_report' and n.user_id = :'admin'), 'Nouveau signalement : le fondateur est prévenu');
+select t.ok((select count(*) from notifications where key = 'invoice_issued') = (select count(*) from invoices where shop_id is not null)
+            and exists (select 1 from invoices), 'Chaque facture : le commerçant est prévenu');
+select t.login(:'admin');
+select admin_set_shop_status(:'m2shop', 'suspended');
+select admin_set_shop_status(:'m2shop', 'active');
+reset role;
+select t.ok(exists (select 1 from notifications n join shops s on s.owner_id = n.user_id where s.id = :'m2shop' and key = 'shop_suspended')
+            and exists (select 1 from notifications n join shops s on s.owner_id = n.user_id where s.id = :'m2shop' and key = 'shop_back'),
+            'Commerce suspendu puis remis en ligne : le commerçant est prévenu');
+select t.ok(not exists (select 1 from notifications where key in ('visit_closed', 'admin_new_shop') and (title is null or body like '%{%')),
+            'Textes des notifications complets');
+
 -- ---------- Bilan ----------
 reset role;
 \o

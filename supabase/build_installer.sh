@@ -75,3 +75,11 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
   echo
   echo "commit;"
 } > "$HERE/MISE_A_JOUR_012_PHOTOS.sql"
+
+{
+  echo "begin;"
+  echo "-- SOUKI DEALS : mise a jour 013 (notifications completes). N'efface rien, relancable."
+  cat "$HERE/migrations/013_notifications_completes.sql"
+  echo
+  echo "commit;"
+} > "$HERE/MISE_A_JOUR_013_NOTIFICATIONS.sql"
