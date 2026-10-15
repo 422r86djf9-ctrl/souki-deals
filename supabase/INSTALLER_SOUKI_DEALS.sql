@@ -3458,4 +3458,9 @@ grant execute on function public.deals_send_auth_email(jsonb) to supabase_auth_a
 revoke execute on function public.deals_auth_email_text(text, text), public.deals_urlencode(text), public.deals_html_escape(text)
   from public, anon, authenticated;
 
+-- >>> 015_bienvenue_1000.sql
+-- 015 : offre de bienvenue (10 €) limitée aux 1000 premiers clients. Relançable.
+alter table public.settings alter column welcome_slots set default 1000;
+update public.settings set welcome_slots = 1000 where id = 1;
+
 commit;
