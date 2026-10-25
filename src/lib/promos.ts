@@ -31,3 +31,10 @@ export function promoUntil(p: Promo): string {
     date: `${String(lastMinute.getDate()).padStart(2, '0')}/${String(lastMinute.getMonth() + 1).padStart(2, '0')}`,
   });
 }
+
+// Offre choisie par le client avant d'entrer dans le magasin (gardée le temps de la visite)
+let chosen: Promo | null = null;
+export const getChosenPromo = () => chosen;
+export function setChosenPromo(p: Promo | null) {
+  chosen = p;
+}

@@ -5,7 +5,7 @@ import { ActivityIndicator, Image, Linking, Modal, Pressable, ScrollView, Text, 
 import { euros, finalCents, Kind, kindLabel, openDirections, Product, unitLabel } from '../../src/lib/deals';
 import { t } from '../../src/lib/i18n';
 import { photoUrl } from '../../src/lib/photos';
-import { Promo, promoLabel, promoUntil } from '../../src/lib/promos';
+import { getChosenPromo, Promo, promoLabel, promoUntil, setChosenPromo } from '../../src/lib/promos';
 import { errorMessage, supabase } from '../../src/lib/supabase';
 import { Button, Chip, colors, DiscountTag, ErrorText, InfoText, Muted, SectionTitle, styles } from '../../src/lib/theme';
 
@@ -37,6 +37,13 @@ export default function Commerce() {
   const [reportProduct, setReportProduct] = useState<number | null>(null);
   const [reportText, setReportText] = useState('');
   const [info, setInfo] = useState('');
+  const [chosenId, setChosenId] = useState<number | null>(getChosenPromo()?.id ?? null);
+
+  function choose(p: Promo) {
+    setChosenPromo(p);
+    setChosenId(p.id);
+    router.push('/entree');
+  }
 
   useEffect(() => {
     (async () => {
@@ -131,6 +138,11 @@ export default function Commerce() {
             {`${p.kind === 'flash' ? t('OFFRE FLASH') : t('CADEAU')} · ${promoUntil(p)}`}
           </Text>
           <Text style={{ fontSize: 17, fontWeight: '900', color: colors.text, marginTop: 2 }}>{promoLabel(p)}</Text>
+          <Button
+            title={chosenId === p.id ? t('Offre choisie ✓ : je suis dans le magasin') : t('Choisir cette offre')}
+            variant={chosenId === p.id ? 'primary' : 'secondary'}
+            onPress={() => choose(p)}
+          />
         </View>
       ))}
       <Button title={t('Je suis dans le magasin : scanner son QR code')} variant="accent" onPress={() => router.push('/entree')} />

@@ -767,6 +767,19 @@ select t.ok(not has_function_privilege('authenticated', 'public.deals_send_auth_
             and has_function_privilege('supabase_auth_admin', 'public.deals_send_auth_email(jsonb)', 'execute'), 'Seul Supabase Auth appelle le hook');
 delete from vault.decrypted_secrets;
 
+-- ---------- Bon de l'offre choisie (016) ----------
+reset role;
+insert into auth.users (id, email, email_confirmed_at) values ('bbbbbbbb-0000-0000-0000-000000000023', 'client3@test.fr', now());
+set role authenticated;
+select t.login('bbbbbbbb-0000-0000-0000-000000000023');
+insert into profiles (id, full_name) values (auth.uid(), 'Amina K.');
+select (client_checkin('SOUKIDEALS:SHOP:' || (select shop_code from shops where id = :'m1shop'))->>'checkin_id') as ck3 \gset
+reset role;
+insert into promos (shop_id, kind, title, discount_pct, ends_at) values (:'m1shop', 'flash', 'Côtelettes', 25, now() + interval '1 day') returning id as prm \gset
+set role authenticated;
+select t.login('bbbbbbbb-0000-0000-0000-000000000023');
+select t.throws(format($$select client_set_checkin_promo(%L, %s)$$, :'ck3', :'pr1'), 'PROMO_INVALID', 'Offre arrêtée : refusée');
+select t.ok((client_set_checkin_promo(:'ck3', :'prm')->>'title') = 'Côtelettes', 'Le client choisit une offre du commerce');
 -- ---------- Bilan ----------
 reset role;
 \o

@@ -9,7 +9,19 @@ import { errorMessage, supabase } from '../lib/supabase';
 import { Button, colors, ErrorText, InfoText, Muted, SectionTitle, styles } from '../lib/theme';
 import { WelcomeBanner } from './WelcomeBanner';
 
-type Visit = { id: string; code: string; first_name: string; created_at: string; expires_at: string; welcome_cents?: number; welcome_min_cents?: number };
+type Visit = {
+  id: string;
+  code: string;
+  first_name: string;
+  created_at: string;
+  expires_at: string;
+  welcome_cents?: number;
+  welcome_min_cents?: number;
+  promo_kind?: 'flash' | 'gift' | null;
+  promo_title?: string | null;
+  promo_pct?: number | null;
+  promo_min_cents?: number | null;
+};
 
 const POLL_MS = 8000;
 
@@ -86,6 +98,16 @@ export function ClientsPresents({ active, discountPct, onPurchase }: { active: b
             <Text style={{ fontSize: 18, fontWeight: '800', color: colors.prune, letterSpacing: 2 }}>{v.code}</Text>
           </View>
           <Muted>{t('Arrivé à {time} · remise de {pct} % à appliquer', { time: timeLabel(v.created_at), pct: String(discountPct).replace('.', ',') })}</Muted>
+          {v.promo_title ? (
+            <View style={{ backgroundColor: colors.saffronSoft, borderRadius: 12, padding: 10, marginTop: 8, borderWidth: 2, borderStyle: 'dashed', borderColor: colors.saffron }}>
+              <Text style={{ fontWeight: '800', color: colors.saffronDark, fontSize: 12 }}>{t('OFFRE CHOISIE PAR LE CLIENT')}</Text>
+              <Text style={{ fontWeight: '900', color: colors.text, fontSize: 18 }}>
+                {v.promo_kind === 'gift'
+                  ? t('{title} offert dès {min}', { title: v.promo_title, min: euros(v.promo_min_cents ?? 0) })
+                  : t('{title} : -{pct} %', { title: v.promo_title, pct: String(v.promo_pct ?? 0).replace('.', ',') })}
+              </Text>
+            </View>
+          ) : null}
           <WelcomeBanner cents={v.welcome_cents ?? 0} minCents={v.welcome_min_cents ?? 0} />
           <Text style={{ fontWeight: '700', color: colors.text, marginTop: 10 }}>{t('Montant payé, remise déduite (€)')}</Text>
           <TextInput

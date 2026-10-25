@@ -20,13 +20,13 @@ PSQL=(psql -h "$WORK" -p "$PORT" -U postgres -d postgres -v ON_ERROR_STOP=1 -q -
 
 # Base remplie par les tests : la mise à jour se relance sans rien perdre
 BEFORE=$("${PSQL[@]}" -tA -c "select count(*) from public.invoices")
-for f in MISE_A_JOUR_005_FACTURES MISE_A_JOUR_006_RELEVE MISE_A_JOUR_007_SCAN MISE_A_JOUR_008_INSCRITS MISE_A_JOUR_009_PROMOS MISE_A_JOUR_010_IBAN MISE_A_JOUR_011_COMPTE_NOTIFS MISE_A_JOUR_012_PHOTOS MISE_A_JOUR_013_NOTIFICATIONS MISE_A_JOUR_014_EMAILS MISE_A_JOUR_015_BIENVENUE_1000; do
+for f in MISE_A_JOUR_005_FACTURES MISE_A_JOUR_006_RELEVE MISE_A_JOUR_007_SCAN MISE_A_JOUR_008_INSCRITS MISE_A_JOUR_009_PROMOS MISE_A_JOUR_010_IBAN MISE_A_JOUR_011_COMPTE_NOTIFS MISE_A_JOUR_012_PHOTOS MISE_A_JOUR_013_NOTIFICATIONS MISE_A_JOUR_014_EMAILS MISE_A_JOUR_015_BIENVENUE_1000 MISE_A_JOUR_016_BON_OFFRE; do
   "${PSQL[@]}" -f "$HERE/$f.sql" >/dev/null
   "${PSQL[@]}" -f "$HERE/$f.sql" >/dev/null
 done
 AFTER=$("${PSQL[@]}" -tA -c "select count(*) from public.invoices")
 [ "$BEFORE" = "$AFTER" ] && [ "$AFTER" -gt 0 ] || { echo "ÉCHEC : la mise à jour a perdu des factures"; exit 1; }
-echo "Mises à jour 005 à 015 relancées deux fois : $AFTER factures conservées"
+echo "Mises à jour 005 à 016 relancées deux fois : $AFTER factures conservées"
 # Factures émises : la remise à zéro doit être refusée
 if "${PSQL[@]}" -f "$HERE/INSTALLER_SOUKI_DEALS.sql" >/dev/null 2>&1; then
   echo "ÉCHEC : remise à zéro acceptée alors que des factures existent"; exit 1

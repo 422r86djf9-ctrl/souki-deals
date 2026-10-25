@@ -617,4 +617,15 @@ export const AR: Record<string, string> = {
   // Version
   'Version {v} · mise à jour du {d}': 'الإصدار {v} · تحديث {d}',
   'Version {v}': 'الإصدار {v}',
+  // Bon de l'offre choisie
+  'Offre choisie ✓ : je suis dans le magasin': 'تم اختيار العرض ✓: أنا في المتجر',
+  'Choisir cette offre': 'اختيار هذا العرض',
+  'Retirer cette offre': 'إزالة هذا العرض',
+  'Une offre en cours ici :': 'عرض متاح هنا:',
+  'Utiliser : {offer}': 'استخدام: {offer}',
+  'BON · OFFRE FLASH': 'قسيمة · عرض خاطف',
+  'BON · CADEAU': 'قسيمة · هدية',
+  'Code {code}': 'الرمز {code}',
+  'Montrez ce bon en caisse : le commerçant le voit aussi sur sa tablette.': 'أظهر هذه القسيمة عند الدفع: يراها التاجر أيضًا على جهازه.',
+  'OFFRE CHOISIE PAR LE CLIENT': 'العرض الذي اختاره الزبون',
 };

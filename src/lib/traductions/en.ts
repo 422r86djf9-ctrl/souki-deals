@@ -617,4 +617,15 @@ export const EN: Record<string, string> = {
   // Version
   'Version {v} · mise à jour du {d}': 'Version {v} · updated {d}',
   'Version {v}': 'Version {v}',
+  // Bon de l'offre choisie
+  'Offre choisie ✓ : je suis dans le magasin': 'Offer chosen ✓: I\'m in the shop',
+  'Choisir cette offre': 'Choose this offer',
+  'Retirer cette offre': 'Remove this offer',
+  'Une offre en cours ici :': 'An offer is running here:',
+  'Utiliser : {offer}': 'Use: {offer}',
+  'BON · OFFRE FLASH': 'VOUCHER · FLASH OFFER',
+  'BON · CADEAU': 'VOUCHER · GIFT',
+  'Code {code}': 'Code {code}',
+  'Montrez ce bon en caisse : le commerçant le voit aussi sur sa tablette.': 'Show this voucher at the till: the shopkeeper also sees it on their tablet.',
+  'OFFRE CHOISIE PAR LE CLIENT': 'OFFER CHOSEN BY THE CUSTOMER',
 };
