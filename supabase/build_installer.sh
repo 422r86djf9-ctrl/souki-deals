@@ -107,3 +107,11 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
   echo
   echo "commit;"
 } > "$HERE/MISE_A_JOUR_016_BON_OFFRE.sql"
+
+{
+  echo "begin;"
+  echo "-- SOUKI DEALS : mise a jour 017 (derniers inscrits, resume quotidien). Relancable."
+  cat "$HERE/migrations/017_inscrits_detail.sql"
+  echo
+  echo "commit;"
+} > "$HERE/MISE_A_JOUR_017_INSCRITS.sql"

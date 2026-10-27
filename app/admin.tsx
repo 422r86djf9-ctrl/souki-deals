@@ -8,6 +8,18 @@ import { photoUrl } from '../src/lib/photos';
 import { errorMessage, supabase, whoami } from '../src/lib/supabase';
 import { Button, Chip, colors, ErrorText, Field, InfoText, Muted, SectionTitle, styles } from '../src/lib/theme';
 
+type LatestMember = {
+  id: string;
+  email: string | null;
+  created_at: string;
+  confirmed: boolean;
+  full_name: string | null;
+  kind: 'particulier' | 'commercant';
+  shop_name: string | null;
+  shop_status: string | null;
+  used: boolean;
+};
+
 type Tab = 'summary' | 'members' | 'shops' | 'scores' | 'disputes' | 'charges' | 'invoices' | 'reports' | 'settings';
 type PromoStats = {
   welcome_enabled: boolean;
@@ -123,6 +135,8 @@ export default function Admin() {
   const [invoices, setInvoices] = useState<AdminInvoice[]>([]);
   const [scores, setScores] = useState<Score[]>([]);
   const [members, setMembers] = useState<Members | null>(null);
+  const [latest, setLatest] = useState<LatestMember[]>([]);
+  const [showAllLatest, setShowAllLatest] = useState(false);
   const [promoStats, setPromoStats] = useState<PromoStats | null>(null);
   const [banks, setBanks] = useState<Record<string, { holder: string; iban: string; bic: string | null; updated_at: string }>>({});
   const [wForm, setWForm] = useState<{ on: boolean; amount: string; min: string; slots: string } | null>(null);
@@ -136,7 +150,7 @@ export default function Admin() {
         router.back();
         return;
       }
-      const [s, sh, d, c, r, z, st, inv, co, sc, mb, ps, bk] = await Promise.all([
+      const [s, sh, d, c, r, z, st, inv, co, sc, mb, ps, bk, lm] = await Promise.all([
         supabase.rpc('admin_summary'),
         supabase
           .from('shops')
@@ -158,6 +172,7 @@ export default function Admin() {
         supabase.rpc('admin_members'),
         supabase.rpc('admin_promo_stats'),
         supabase.from('shop_bank').select('shop_id, holder, iban, bic, updated_at'),
+        supabase.rpc('admin_latest_members', { p_limit: 100 }),
       ]);
       if (s.error) throw s.error;
       setSummary(s.data as Summary);
@@ -182,6 +197,7 @@ export default function Admin() {
       setInvoices((inv.data ?? []) as AdminInvoice[]);
       setScores((sc.data ?? []) as Score[]);
       setMembers((mb.data ?? null) as Members | null);
+      setLatest((lm.data ?? []) as LatestMember[]);
       const bm: Record<string, { holder: string; iban: string; bic: string | null; updated_at: string }> = {};
       for (const b of (bk.data ?? []) as { shop_id: string; holder: string; iban: string; bic: string | null; updated_at: string }[]) bm[b.shop_id] = b;
       setBanks(bm);
@@ -466,6 +482,56 @@ export default function Admin() {
               <Text style={{ fontWeight: '900', color: colors.prune }}>{String(value)}</Text>
             </View>
           ))}
+
+          <SectionTitle>{t('Derniers inscrits')}</SectionTitle>
+          {latest.length === 0 ? <Muted>{t('Personne ne s’est encore inscrit.')}</Muted> : null}
+          {(showAllLatest ? latest : latest.slice(0, 15)).map((m) => {
+            const d = new Date(m.created_at);
+            const hour = `${String(d.getHours()).padStart(2, '0')}h${String(d.getMinutes()).padStart(2, '0')}`;
+            return (
+              <View key={m.id} style={[styles.card, { paddingVertical: 10 }]}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontWeight: '800', color: colors.text, flex: 1 }} numberOfLines={1}>
+                    {m.kind === 'commercant' && m.shop_name ? m.shop_name : m.full_name || t('Sans prénom')}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: '800',
+                      paddingHorizontal: 8,
+                      paddingVertical: 3,
+                      borderRadius: 6,
+                      overflow: 'hidden',
+                      color: m.kind === 'commercant' ? colors.saffronDark : colors.prune,
+                      backgroundColor: m.kind === 'commercant' ? '#FFF1E3' : '#E5F4EA',
+                    }}
+                  >
+                    {m.kind === 'commercant' ? t('Commerçant') : t('Particulier')}
+                  </Text>
+                </View>
+                {m.kind === 'commercant' && m.full_name ? <Muted>{m.full_name}</Muted> : null}
+                <Text style={{ color: colors.text, fontSize: 13, marginTop: 2 }} selectable>
+                  {m.email ?? ''}
+                </Text>
+                <Muted>
+                  {[
+                    t('Inscrit le {d} à {h}', { d: fullDate(m.created_at), h: hour }),
+                    m.confirmed ? null : t('e-mail pas encore confirmé'),
+                    m.kind === 'particulier' ? (m.used ? t('a déjà utilisé l’appli') : t('pas encore utilisé')) : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </Muted>
+              </View>
+            );
+          })}
+          {latest.length > 15 ? (
+            <Button
+              title={showAllLatest ? t('Voir moins') : t('Voir les {n} derniers', { n: latest.length })}
+              variant="secondary"
+              onPress={() => setShowAllLatest((v) => !v)}
+            />
+          ) : null}
 
           <SectionTitle>{t('Inscriptions des 12 dernières semaines')}</SectionTitle>
           <View style={styles.card}>

@@ -628,4 +628,13 @@ export const AR: Record<string, string> = {
   'Code {code}': 'الرمز {code}',
   'Montrez ce bon en caisse : le commerçant le voit aussi sur sa tablette.': 'أظهر هذه القسيمة عند الدفع: يراها التاجر أيضًا على جهازه.',
   'OFFRE CHOISIE PAR LE CLIENT': 'العرض الذي اختاره الزبون',
+  'Derniers inscrits': 'آخر المسجّلين',
+  'Personne ne s’est encore inscrit.': 'لم يسجّل أحد بعد.',
+  'Sans prénom': 'بدون اسم',
+  'Inscrit le {d} à {h}': 'سجّل يوم {d} على الساعة {h}',
+  'e-mail pas encore confirmé': 'البريد لم يُؤكَّد بعد',
+  'a déjà utilisé l’appli': 'استعمل التطبيق من قبل',
+  'pas encore utilisé': 'لم يستعمله بعد',
+  'Voir moins': 'عرض أقل',
+  'Voir les {n} derniers': 'عرض آخر {n}',
 };

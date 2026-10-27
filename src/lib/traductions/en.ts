@@ -628,4 +628,13 @@ export const EN: Record<string, string> = {
   'Code {code}': 'Code {code}',
   'Montrez ce bon en caisse : le commerçant le voit aussi sur sa tablette.': 'Show this voucher at the till: the shopkeeper also sees it on their tablet.',
   'OFFRE CHOISIE PAR LE CLIENT': 'OFFER CHOSEN BY THE CUSTOMER',
+  'Derniers inscrits': 'Latest sign-ups',
+  'Personne ne s’est encore inscrit.': 'Nobody has signed up yet.',
+  'Sans prénom': 'No first name',
+  'Inscrit le {d} à {h}': 'Signed up on {d} at {h}',
+  'e-mail pas encore confirmé': 'email not confirmed yet',
+  'a déjà utilisé l’appli': 'has already used the app',
+  'pas encore utilisé': 'not used yet',
+  'Voir moins': 'Show less',
+  'Voir les {n} derniers': 'Show the latest {n}',
 };

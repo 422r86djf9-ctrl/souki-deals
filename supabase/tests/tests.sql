@@ -780,6 +780,21 @@ set role authenticated;
 select t.login('bbbbbbbb-0000-0000-0000-000000000023');
 select t.throws(format($$select client_set_checkin_promo(%L, %s)$$, :'ck3', :'pr1'), 'PROMO_INVALID', 'Offre arrêtée : refusée');
 select t.ok((client_set_checkin_promo(:'ck3', :'prm')->>'title') = 'Côtelettes', 'Le client choisit une offre du commerce');
+-- ---------- Derniers inscrits (017) ----------
+select t.login(:'c1');
+select t.throws($$select admin_latest_members()$$, 'NOT_ADMIN', 'Liste des inscrits réservée au fondateur');
+select t.login(:'admin');
+select t.ok((select count(*) from jsonb_array_elements(admin_latest_members()) e where e->>'email' = 'demba.sacko20@gmail.com') = 0
+            and (select count(*) from jsonb_array_elements(admin_latest_members()) e where e->>'email' = 'client3@test.fr' and e->>'kind' = 'particulier' and e->>'full_name' = 'Amina K.') = 1
+            and (select count(*) from jsonb_array_elements(admin_latest_members()) e where e->>'kind' = 'commercant' and e->>'shop_name' is not null) >= 2,
+            'Le fondateur voit les derniers inscrits : nom, e-mail, particulier ou commerçant');
+reset role;
+delete from notifications where key = 'admin_daily_signups';
+select deals_daily_signups();
+select t.ok(exists (select 1 from notifications where key = 'admin_daily_signups' and user_id = :'admin' and body like '%inscrits aujourd''hui%'),
+            'Résumé du soir envoyé au fondateur');
+set role authenticated;
+
 -- ---------- Bilan ----------
 reset role;
 \o
