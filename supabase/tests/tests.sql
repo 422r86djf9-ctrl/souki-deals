@@ -795,6 +795,29 @@ select t.ok(exists (select 1 from notifications where key = 'admin_daily_signups
             'Résumé du soir envoyé au fondateur');
 set role authenticated;
 
+-- ---------- Messagerie avec le fondateur (018) ----------
+select t.login(:'c2');
+select t.throws($$select support_send('   ')$$, 'MESSAGE_EMPTY', 'Message vide refusé');
+select t.ok((support_send('Bonjour, la boucherie près de chez moi n''est pas encore inscrite')->>'from_admin')::boolean = false, 'Le particulier écrit au fondateur');
+select t.throws($$select admin_support_threads()$$, 'NOT_ADMIN', 'Liste des conversations réservée au fondateur');
+select t.throws(format($$select admin_support_reply(%L, 'x')$$, :'c1'), 'NOT_ADMIN', 'Seul le fondateur répond');
+select t.login(:'c1');
+select t.ok(jsonb_array_length(support_my_thread()) = 0, 'Un autre inscrit ne voit pas la conversation');
+select t.ok((select count(*) from support_messages) = 0, 'Table protégée : chacun ne lit que ses messages');
+select t.login(:'admin');
+select t.ok(exists (select 1 from notifications where key = 'admin_new_message' and user_id = :'admin' and title like 'Message de %'), 'Le fondateur est prévenu du message');
+select t.ok(support_unread() >= 1, 'Pastille : message non lu pour le fondateur');
+select t.ok((select (e->>'unread')::int from jsonb_array_elements(admin_support_threads()) e where e->>'user_id' = :'c2') = 1, 'La conversation apparaît avec 1 non lu');
+select t.ok(jsonb_array_length(admin_support_thread(:'c2')->'messages') = 1, 'Le fondateur ouvre la conversation');
+select t.ok(support_unread() = 0, 'Le fondateur lit : plus de non lu');
+select t.ok((admin_support_reply(:'c2', 'Merci, je passe la voir cette semaine')->>'from_admin')::boolean, 'Le fondateur répond');
+select t.throws($$select support_send('test')$$, 'USE_ADMIN', 'Le fondateur ne s''écrit pas à lui-même');
+select t.login(:'c2');
+select t.ok(exists (select 1 from notifications where key = 'support_reply' and user_id = :'c2'), 'Le particulier est prévenu de la réponse');
+select t.ok(support_unread() = 1, 'Pastille : réponse non lue');
+select t.ok(jsonb_array_length(support_my_thread()) = 2, 'Le particulier voit les deux messages');
+select t.ok(support_unread() = 0, 'Réponse lue : plus de pastille');
+
 -- ---------- Bilan ----------
 reset role;
 \o

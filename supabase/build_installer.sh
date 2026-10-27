@@ -115,3 +115,11 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
   echo
   echo "commit;"
 } > "$HERE/MISE_A_JOUR_017_INSCRITS.sql"
+
+{
+  echo "begin;"
+  echo "-- SOUKI DEALS : mise a jour 018 (messagerie avec le fondateur). Relancable."
+  cat "$HERE/migrations/018_messagerie.sql"
+  echo
+  echo "commit;"
+} > "$HERE/MISE_A_JOUR_018_MESSAGERIE.sql"

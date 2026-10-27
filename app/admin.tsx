@@ -1,5 +1,5 @@
 // Administration (fondateur uniquement)
-import { Stack, router, useFocusEffect } from 'expo-router';
+import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Linking, Pressable, RefreshControl, ScrollView, Switch, Text, View } from 'react-native';
 import { euros, fullDate, Invoice, invoiceEmailLabel, kindLabel, parseEuros, shortDate, Zone } from '../src/lib/deals';
@@ -7,6 +7,18 @@ import { t, zoneLabel } from '../src/lib/i18n';
 import { photoUrl } from '../src/lib/photos';
 import { errorMessage, supabase, whoami } from '../src/lib/supabase';
 import { Button, Chip, colors, ErrorText, Field, InfoText, Muted, SectionTitle, styles } from '../src/lib/theme';
+
+type Thread = {
+  user_id: string;
+  email: string | null;
+  full_name: string | null;
+  shop_name: string | null;
+  kind: 'particulier' | 'commercant';
+  last_at: string;
+  last_body: string;
+  last_from_admin: boolean;
+  unread: number;
+};
 
 type LatestMember = {
   id: string;
@@ -20,7 +32,7 @@ type LatestMember = {
   used: boolean;
 };
 
-type Tab = 'summary' | 'members' | 'shops' | 'scores' | 'disputes' | 'charges' | 'invoices' | 'reports' | 'settings';
+type Tab = 'summary' | 'messages' | 'members' | 'shops' | 'scores' | 'disputes' | 'charges' | 'invoices' | 'reports' | 'settings';
 type PromoStats = {
   welcome_enabled: boolean;
   welcome_amount_cents: number;
@@ -118,7 +130,9 @@ function statusLabel(s: ShopRow['status']) {
 }
 
 export default function Admin() {
-  const [tab, setTab] = useState<Tab>('summary');
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const [tab, setTab] = useState<Tab>(params.tab === 'messages' ? 'messages' : 'summary');
+  const [threads, setThreads] = useState<Thread[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -150,7 +164,7 @@ export default function Admin() {
         router.back();
         return;
       }
-      const [s, sh, d, c, r, z, st, inv, co, sc, mb, ps, bk, lm] = await Promise.all([
+      const [s, sh, d, c, r, z, st, inv, co, sc, mb, ps, bk, lm, th] = await Promise.all([
         supabase.rpc('admin_summary'),
         supabase
           .from('shops')
@@ -173,6 +187,7 @@ export default function Admin() {
         supabase.rpc('admin_promo_stats'),
         supabase.from('shop_bank').select('shop_id, holder, iban, bic, updated_at'),
         supabase.rpc('admin_latest_members', { p_limit: 100 }),
+        supabase.rpc('admin_support_threads'),
       ]);
       if (s.error) throw s.error;
       setSummary(s.data as Summary);
@@ -198,6 +213,7 @@ export default function Admin() {
       setScores((sc.data ?? []) as Score[]);
       setMembers((mb.data ?? null) as Members | null);
       setLatest((lm.data ?? []) as LatestMember[]);
+      setThreads((th.data ?? []) as Thread[]);
       const bm: Record<string, { holder: string; iban: string; bic: string | null; updated_at: string }> = {};
       for (const b of (bk.data ?? []) as { shop_id: string; holder: string; iban: string; bic: string | null; updated_at: string }[]) bm[b.shop_id] = b;
       setBanks(bm);
@@ -360,6 +376,10 @@ export default function Admin() {
       <Stack.Screen options={{ title: t('Administration') }} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
         <Chip label={t('Résumé')} selected={tab === 'summary'} onPress={() => setTab('summary')} />
+        {(() => {
+          const n = threads.reduce((a, x) => a + x.unread, 0);
+          return <Chip label={n ? t('Messages ({n} non lus)', { n }) : t('Messages')} selected={tab === 'messages'} onPress={() => setTab('messages')} />;
+        })()}
         <Chip label={t('Inscrits')} selected={tab === 'members'} onPress={() => setTab('members')} />
         <Chip label={pendingShops ? t('Commerces ({n} à valider)', { n: pendingShops }) : t('Commerces')} selected={tab === 'shops'} onPress={() => setTab('shops')} />
         <Chip label={suspicious ? t('Méfiance ({n})', { n: suspicious }) : t('Méfiance')} selected={tab === 'scores'} onPress={() => setTab('scores')} />
@@ -450,6 +470,41 @@ export default function Admin() {
               </View>
             );
           })}
+        </View>
+      ) : null}
+
+      {tab === 'messages' ? (
+        <View>
+          <Muted>{t('Les inscrits vous écrivent depuis « Écrire au fondateur » sur leur accueil. Vous êtes prévenu à chaque message.')}</Muted>
+          {threads.length === 0 ? (
+            <View style={{ marginTop: 12 }}>
+              <Muted>{t('Aucun message pour le moment.')}</Muted>
+            </View>
+          ) : null}
+          {threads.map((th) => (
+            <Pressable
+              key={th.user_id}
+              onPress={() => router.push({ pathname: '/messages', params: { user: th.user_id } })}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.card, { paddingVertical: 10 }, th.unread > 0 && { borderColor: colors.saffron, borderWidth: 2 }, pressed && { opacity: 0.85 }]}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontWeight: '800', color: colors.text, flex: 1 }} numberOfLines={1}>
+                  {(th.kind === 'commercant' && th.shop_name) || th.full_name || th.email}
+                </Text>
+                {th.unread > 0 ? (
+                  <Text style={{ backgroundColor: colors.saffron, color: '#fff', fontWeight: '800', fontSize: 12, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99, overflow: 'hidden' }}>
+                    {String(th.unread)}
+                  </Text>
+                ) : null}
+              </View>
+              <Text style={{ color: colors.text, marginTop: 2 }} numberOfLines={2}>
+                {th.last_from_admin ? `${t('Vous')} : ` : ''}
+                {th.last_body}
+              </Text>
+              <Muted>{`${th.kind === 'commercant' ? t('Commerçant') : t('Particulier')} · ${fullDate(th.last_at)}`}</Muted>
+            </Pressable>
+          ))}
         </View>
       ) : null}
 

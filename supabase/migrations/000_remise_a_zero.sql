@@ -11,7 +11,7 @@ begin
   if exists (select 1 from information_schema.tables
              where table_schema = 'public'
                and table_name not in ('settings', 'zones', 'profiles', 'shops', 'products',
-                                      'vouchers', 'purchases', 'charges', 'reports', 'company', 'invoices', 'checkins', 'promos', 'shop_bank', 'push_tokens', 'notifications')) then
+                                      'vouchers', 'purchases', 'charges', 'reports', 'company', 'invoices', 'checkins', 'promos', 'shop_bank', 'push_tokens', 'notifications', 'support_messages')) then
     raise exception 'SOUKI DEALS : ce projet Supabase contient d''autres tables. Installez Souki Deals dans un projet dédié.';
   end if;
 end $$;
@@ -29,7 +29,7 @@ begin
 end $$;
 
 drop table if exists
-  public.notifications, public.push_tokens, public.shop_bank, public.promos, public.checkins, public.invoices, public.company, public.reports, public.charges, public.purchases, public.vouchers,
+  public.support_messages, public.notifications, public.push_tokens, public.shop_bank, public.promos, public.checkins, public.invoices, public.company, public.reports, public.charges, public.purchases, public.vouchers,
   public.products, public.shops, public.profiles, public.zones, public.settings
 cascade;
 

@@ -53,6 +53,7 @@ export default function Accueil() {
   const [refreshing, setRefreshing] = useState(false);
   const [welcome, setWelcome] = useState<{ amount_cents: number; min_cents: number } | null>(null);
   const [promoCount, setPromoCount] = useState(0);
+  const [unread, setUnread] = useState(0);
 
   const load = useCallback(async () => {
     setError('');
@@ -66,7 +67,12 @@ export default function Accueil() {
       setMe(data);
       registerForPush();
       updateMyArea();
-      const [w, pr] = await Promise.all([supabase.rpc('client_welcome'), supabase.rpc('active_promos', { p_lat: null, p_lng: null, p_radius_km: null })]);
+      const [w, pr, un] = await Promise.all([
+        supabase.rpc('client_welcome'),
+        supabase.rpc('active_promos', { p_lat: null, p_lng: null, p_radius_km: null }),
+        supabase.rpc('support_unread'),
+      ]);
+      setUnread(typeof un.data === 'number' ? un.data : 0);
       setWelcome((w.data ?? null) as { amount_cents: number; min_cents: number } | null);
       setPromoCount(((pr.data ?? []) as unknown[]).length);
     } catch (e) {
@@ -167,7 +173,26 @@ export default function Accueil() {
               ) : null}
             </>
           )}
-          {me.is_admin ? <Card title={t('Administration')} subtitle={t('Commerces, contestations, commissions, réglages.')} badge={t('Fondateur')} href="/admin" /> : null}
+          {me.is_admin ? (
+            <>
+              <Card title={t('Administration')} subtitle={t('Commerces, contestations, commissions, réglages.')} badge={t('Fondateur')} href="/admin" />
+              <Card
+                title={t('Messages des inscrits')}
+                subtitle={t('Les particuliers et commerçants qui vous écrivent.')}
+                badge={unread > 0 ? t('{n} non lus', { n: unread }) : undefined}
+                href="/admin?tab=messages"
+                strong={unread > 0}
+              />
+            </>
+          ) : (
+            <Card
+              title={t('Écrire au fondateur')}
+              subtitle={t('Une question, une idée, un souci ? Je vous réponds directement.')}
+              badge={unread > 0 ? t('{n} nouvelle réponse', { n: unread }) : undefined}
+              href="/messages"
+              strong={unread > 0}
+            />
+          )}
         </>
       ) : null}
 
