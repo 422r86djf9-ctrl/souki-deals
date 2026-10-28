@@ -685,4 +685,5 @@ export const EN: Record<string, string> = {
   'Téléchargement de la mise à jour…': 'Downloading the update…',
   'Erreur': 'Error',
   'Chercher une mise à jour': 'Check for an update',
+  'Merguez, agneau, poulet, dattes…': 'Merguez, lamb, chicken, dates…',
 };

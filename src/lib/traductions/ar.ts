@@ -685,4 +685,5 @@ export const AR: Record<string, string> = {
   'Téléchargement de la mise à jour…': 'جارٍ تنزيل التحديث…',
   'Erreur': 'خطأ',
   'Chercher une mise à jour': 'البحث عن تحديث',
+  'Merguez, agneau, poulet, dattes…': 'مرقاز، لحم خروف، دجاج، تمر…',
 };

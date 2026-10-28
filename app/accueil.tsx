@@ -191,7 +191,7 @@ export default function Accueil() {
               style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FFFFFF', borderRadius: 14, height: 48, paddingHorizontal: 14 }}
             >
               <Icon name="search" color={colors.muted} size={20} />
-              <Text style={{ color: colors.muted, fontSize: 14 }}>{t('Merguez, agneau, poulet…')}</Text>
+              <Text style={{ color: colors.muted, fontSize: 14 }}>{t('Merguez, agneau, poulet, dattes…')}</Text>
             </Pressable>
           </View>
 
