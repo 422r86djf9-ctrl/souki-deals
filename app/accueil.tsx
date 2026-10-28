@@ -9,6 +9,7 @@ import { t } from '../src/lib/i18n';
 import { errorMessage, supabase, whoami, Whoami } from '../src/lib/supabase';
 import { Button, colors, DiscountTag, ErrorText, Muted, styles } from '../src/lib/theme';
 import { Icon, IconName } from '../src/components/Icon';
+import { tryArrive } from '../src/lib/arrival';
 
 function Card({ title, subtitle, badge, href, strong }: { title: string; subtitle: string; badge?: string; href: Href; strong?: boolean }) {
   return (
@@ -101,6 +102,7 @@ export default function Accueil() {
   const [welcome, setWelcome] = useState<{ amount_cents: number; min_cents: number } | null>(null);
   const [promoCount, setPromoCount] = useState(0);
   const [unread, setUnread] = useState(0);
+  const [resa, setResa] = useState<{ id: string; status: string; shops: { name: string } | null; promos: { title: string } | null } | null>(null);
 
   const load = useCallback(async () => {
     setError('');
@@ -120,6 +122,23 @@ export default function Accueil() {
         supabase.rpc('support_unread'),
       ]);
       setUnread(typeof un.data === 'number' ? un.data : 0);
+      // Précommande ou visite en cours : rappel, et activation automatique si on est déjà au magasin
+      const { data: rv } = await supabase
+        .from('checkins')
+        .select('id, status, shops(name), promos(title)')
+        .eq('client_id', data.user_id)
+        .in('status', ['reserved', 'waiting'])
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const r = (rv ?? null) as unknown as { id: string; status: string; shops: { name: string } | null; promos: { title: string } | null } | null;
+      setResa(r);
+      if (r?.status === 'reserved') {
+        tryArrive(r.id, false).then((a) => {
+          if (a.ok) router.push('/entree');
+        });
+      }
       setWelcome((w.data ?? null) as { amount_cents: number; min_cents: number } | null);
       setPromoCount(((pr.data ?? []) as unknown[]).length);
       setPromos((pr.data ?? []) as Promo[]);
@@ -197,6 +216,21 @@ export default function Accueil() {
 
           <View style={{ padding: 20, gap: 16 }}>
             <ErrorText>{error}</ErrorText>
+            {resa ? (
+              <Pressable
+                onPress={() => router.push('/entree')}
+                accessibilityRole="button"
+                style={({ pressed }) => [{ backgroundColor: colors.prune, borderRadius: 18, padding: 14, gap: 2 }, pressed && { opacity: 0.85 }]}
+              >
+                <Text style={{ color: '#CDEBD7', fontSize: 12, fontWeight: '800', letterSpacing: 1 }}>
+                  {resa.status === 'reserved' ? t('PRÉCOMMANDE EN COURS') : t('VISITE EN COURS')}
+                </Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 17, fontWeight: '900' }}>{resa.shops?.name ?? ''}</Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 13 }}>
+                  {resa.status === 'reserved' ? t('Ouvrez l’appli en arrivant : votre visite s’active toute seule.') : t('Touchez pour voir votre bon.')}
+                </Text>
+              </Pressable>
+            ) : null}
             {pending > 0 ? (
               <Card
                 title={pending > 1 ? t('{n} achats à confirmer', { n: pending }) : t('{n} achat à confirmer', { n: pending })}

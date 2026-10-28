@@ -5,7 +5,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { PurchaseAnswer } from '../src/components/PurchaseAnswer';
 import { Scanner } from '../src/components/Scanner';
-import { euros, shopCodeFromScan } from '../src/lib/deals';
+import { euros, openDirections, shopCodeFromScan } from '../src/lib/deals';
+import { tryArrive } from '../src/lib/arrival';
 import { t } from '../src/lib/i18n';
 import { getChosenPromo, Promo, promoLabel, setChosenPromo } from '../src/lib/promos';
 import { errorMessage, supabase } from '../src/lib/supabase';
@@ -13,12 +14,12 @@ import { Button, colors, DiscountTag, ErrorText, Field, Muted, styles } from '..
 
 type Visit = {
   id: string;
-  status: 'waiting' | 'done' | 'expired' | 'dismissed' | 'cancelled';
+  status: 'reserved' | 'waiting' | 'done' | 'expired' | 'dismissed' | 'cancelled';
   expires_at: string;
   purchase_id: string | null;
   shop_id: string;
   promos: Promo | null;
-  shops: { name: string; discount_pct: number } | null;
+  shops: { name: string; discount_pct: number; lat: number; lng: number } | null;
   vouchers: { code: string } | null;
 };
 type Purchase = { id: string; amount_cents: number; welcome_cents: number; status: string };
@@ -35,6 +36,9 @@ export default function Entree() {
   const [welcome, setWelcome] = useState<{ amount_cents: number; min_cents: number } | null>(null);
   const [shopPromos, setShopPromos] = useState<Promo[]>([]);
   const [firstName, setFirstName] = useState('');
+  const [arriveMsg, setArriveMsg] = useState('');
+  const [checking, setChecking] = useState(false);
+  const [showScan, setShowScan] = useState(false);
 
   const loadVisit = useCallback(async (id?: string) => {
     const { data: u } = await supabase.auth.getUser();
@@ -48,13 +52,13 @@ export default function Entree() {
       .then(({ data: pf }) => setFirstName(((pf as { full_name: string | null } | null)?.full_name ?? '').split(' ')[0]));
     let q = supabase
       .from('checkins')
-      .select('id, status, expires_at, purchase_id, shop_id, promos(id, shop_id, kind, title, discount_pct, min_cents, ends_at), shops(name, discount_pct), vouchers(code)')
+      .select('id, status, expires_at, purchase_id, shop_id, promos(id, shop_id, kind, title, discount_pct, min_cents, ends_at), shops(name, discount_pct, lat, lng), vouchers(code)')
       .eq('client_id', uid);
-    q = id ? q.eq('id', id) : q.eq('status', 'waiting').gt('expires_at', new Date().toISOString());
+    q = id ? q.eq('id', id) : q.in('status', ['waiting', 'reserved']).gt('expires_at', new Date().toISOString());
     const { data } = await q.order('created_at', { ascending: false }).limit(1).maybeSingle();
     const v = (data ?? null) as unknown as Visit | null;
     setVisit(v);
-    if (v && v.status === 'waiting') {
+    if (v && (v.status === 'waiting' || v.status === 'reserved')) {
       const { data: pr } = await supabase
         .from('promos')
         .select('id, shop_id, kind, title, discount_pct, min_cents, ends_at')
@@ -76,6 +80,32 @@ export default function Entree() {
       supabase.rpc('client_welcome').then(({ data }) => setWelcome((data ?? null) as { amount_cents: number; min_cents: number } | null));
     }, [loadVisit]),
   );
+
+  // Précommande : on vérifie la position (à l'ouverture, puis toutes les 20 s) pour activer la visite à l'arrivée
+  const arrive = useCallback(
+    async (manual: boolean) => {
+      if (!visit || visit.status !== 'reserved') return;
+      setChecking(true);
+      const r = await tryArrive(visit.id, manual);
+      setChecking(false);
+      if (r.ok) {
+        setArriveMsg('');
+        await loadVisit(visit.id);
+      } else if (r.message === 'NO_PERMISSION') {
+        setArriveMsg(t('Autorisez la localisation pour que l’appli détecte votre arrivée, ou scannez le QR code du comptoir.'));
+      } else if (manual || r.far) {
+        setArriveMsg(r.message);
+      }
+    },
+    [visit, loadVisit],
+  );
+  useEffect(() => {
+    if (!visit || visit.status !== 'reserved') return;
+    arrive(false);
+    const timer = setInterval(() => arrive(false), 20000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visit?.id, visit?.status]);
 
   // En attente du montant : on regarde régulièrement si le commerçant l'a saisi
   useEffect(() => {
@@ -111,7 +141,10 @@ export default function Entree() {
 
   function leave() {
     if (!visit) return;
-    Alert.alert(t('Repartir sans acheter ?'), t('Votre visite et votre bon seront annulés.'), [
+    Alert.alert(
+      visit.status === 'reserved' ? t('Annuler la précommande ?') : t('Repartir sans acheter ?'),
+      t('Votre visite et votre bon seront annulés.'),
+      [
       { text: t('Rester'), style: 'cancel' },
       {
         text: t('Je repars'),
@@ -133,7 +166,7 @@ export default function Entree() {
       <ErrorText>{error}</ErrorText>
 
       {/* 1. Scanner le QR code du magasin */}
-      {!visit || visit.status === 'cancelled' ? (
+      {!visit || visit.status === 'cancelled' || (visit.status === 'reserved' && showScan) ? (
         <>
           <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text }}>{t('Scannez le QR code Souki Deals du magasin')}</Text>
           <Muted>{t('Il est collé sur la tablette, au comptoir. Votre remise sera appliquée en caisse.')}</Muted>
@@ -157,6 +190,34 @@ export default function Entree() {
           />
           <Button title={t('Valider le code')} variant="secondary" onPress={() => checkin(typed)} disabled={typed.length !== 8 || busy} />
         </>
+      ) : null}
+
+      {/* 1 bis. Précommande : en route vers le magasin */}
+      {visit?.status === 'reserved' && !showScan ? (
+        <View style={{ gap: 14 }}>
+          <View style={{ backgroundColor: colors.prune, borderRadius: 22, padding: 18, gap: 6 }}>
+            <Text style={{ color: '#CDEBD7', fontWeight: '800', fontSize: 12, letterSpacing: 1 }}>{t('PRÉCOMMANDE VALIDÉE ✓')}</Text>
+            <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 24 }}>{visit.shops?.name ?? ''}</Text>
+            <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '700' }}>
+              {visit.promos ? promoLabel(visit.promos) : t('Remise de {pct} % sur tout le magasin', { pct: Number(visit.shops?.discount_pct ?? 5).toLocaleString('fr-FR') })}
+            </Text>
+          </View>
+          <View style={[styles.card, { gap: 6 }]}>
+            <Text style={{ fontWeight: '800', color: colors.text, fontSize: 16 }}>{t('En arrivant, ouvrez simplement l’appli')}</Text>
+            <Text style={{ color: colors.text }}>
+              {t('Elle détecte que vous êtes au magasin et prévient le commerçant. Vous n’avez rien à scanner ni à montrer : après avoir payé, vous confirmez juste le montant.')}
+            </Text>
+          </View>
+          {arriveMsg ? <Text style={{ color: colors.saffronDark, fontWeight: '700', textAlign: 'center' }}>{arriveMsg}</Text> : null}
+          <Button title={checking ? t('Vérification de votre position…') : t('Je suis arrivé')} onPress={() => arrive(true)} disabled={checking} />
+          {visit.shops ? <Button title={t('Itinéraire')} variant="secondary" onPress={() => openDirections(visit.shops!.lat, visit.shops!.lng)} /> : null}
+          <Pressable onPress={() => setShowScan(true)} accessibilityRole="button" style={{ paddingVertical: 8 }}>
+            <Text style={{ color: colors.prune, fontWeight: '700', textAlign: 'center' }}>{t('Pas détecté ? Scannez le QR code du comptoir')}</Text>
+          </Pressable>
+          <Pressable onPress={leave} accessibilityRole="button" style={{ paddingVertical: 8 }}>
+            <Text style={{ color: colors.muted, textAlign: 'center', textDecorationLine: 'underline' }}>{t('Annuler la précommande')}</Text>
+          </Pressable>
+        </View>
       ) : null}
 
       {/* 2. En attente du montant : le bon à montrer en caisse */}
@@ -194,7 +255,7 @@ export default function Entree() {
               </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.pruneSoft, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 }}>
                 <ActivityIndicator size="small" color={colors.prune} />
-                <Text style={{ color: colors.prune, fontWeight: '700', fontSize: 13, flexShrink: 1 }}>{t('Le commerçant vous voit sur sa tablette')}</Text>
+                <Text style={{ color: colors.prune, fontWeight: '700', fontSize: 13, flexShrink: 1 }}>{t('Le commerçant vous voit sur sa tablette : inutile de montrer votre téléphone')}</Text>
               </View>
             </View>
           </View>

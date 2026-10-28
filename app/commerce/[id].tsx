@@ -43,11 +43,20 @@ export default function Commerce() {
   const [info, setInfo] = useState('');
   const [chosenId, setChosenId] = useState<number | null>(getChosenPromo()?.id ?? null);
 
-  function choose(p: Promo) {
-    setChosenPromo(p);
-    setChosenId(p.id);
+  // « J'y vais » : précommande (offre facultative). La visite s'active à l'arrivée au magasin.
+  async function reserve(p: Promo | null) {
+    setError('');
+    setBusy(true);
+    const { error } = await supabase.rpc('client_reserve', { p_shop_id: id, p_promo_id: p ? p.id : chosenId });
+    setBusy(false);
+    if (error) return setError(errorMessage(error));
+    if (p) {
+      setChosenPromo(p);
+      setChosenId(p.id);
+    }
     router.push('/entree');
   }
+  const choose = (p: Promo) => reserve(p);
 
   useEffect(() => {
     (async () => {
@@ -193,7 +202,7 @@ export default function Commerce() {
                 ]}
               >
                 <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 15 }}>
-                  {chosenId === p.id ? t('Offre choisie ✓ : je suis dans le magasin') : t('Choisir cette offre')}
+                  {chosenId === p.id ? t('Offre réservée ✓') : t('Réserver cette offre')}
                 </Text>
               </Pressable>
             </View>
@@ -312,12 +321,13 @@ export default function Commerce() {
           </Pressable>
         ) : null}
         <Pressable
-          onPress={() => router.push('/entree')}
+          onPress={() => reserve(null)}
+          disabled={busy}
           accessibilityRole="button"
-          style={({ pressed }) => [{ flex: 1, height: 56, borderRadius: 16, backgroundColor: colors.prune, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 }, pressed && { opacity: 0.85 }]}
+          style={({ pressed }) => [{ flex: 1, height: 56, borderRadius: 16, backgroundColor: colors.prune, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 }, (pressed || busy) && { opacity: 0.85 }]}
         >
-          <Icon name="scan" color="#FFFFFF" />
-          <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 15, flexShrink: 1 }} numberOfLines={1} adjustsFontSizeToFit>{t('Je suis dans le magasin')}</Text>
+          <Icon name="flash" color="#FFFFFF" />
+          <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 15, flexShrink: 1 }} numberOfLines={1} adjustsFontSizeToFit>{t('J’y vais')}</Text>
         </Pressable>
       </View>
     </View>

@@ -838,6 +838,43 @@ select t.ok((select count(*) from merchant_checkins()) = 1, 'La boutique d''essa
 select t.login(:'c1');
 select t.ok((select count(*) from active_promos(null, null, null) p where p.shop_id = :'essai_id') = 0, 'Boutique d''essai active mais absente des offres des clients');
 
+-- ---------- Précommande et arrivée détectée (022) ----------
+reset role;
+select t.login(null);
+insert into auth.users (id, email, email_confirmed_at) values ('bbbbbbbb-0000-0000-0000-000000000044', 'precommande@test.fr', now());
+insert into profiles (id, full_name) values ('bbbbbbbb-0000-0000-0000-000000000044', 'Yasmine B.') on conflict (id) do update set full_name = excluded.full_name;
+select lat as m2lat, lng as m2lng, shop_code as m2code from shops where id = :'m2shop' \gset
+delete from notifications where key = 'client_present';
+set role authenticated;
+select t.login('bbbbbbbb-0000-0000-0000-000000000044');
+select client_reserve(:'m2shop')->>'checkin_id' as rsv \gset
+select t.ok((select status from checkins where id = :'rsv') = 'reserved', 'Précommande créée depuis chez soi');
+reset role;
+select t.ok(not exists (select 1 from notifications where key = 'client_present'), 'Le commerçant n''est pas dérangé par une précommande');
+set role authenticated;
+select t.login(:'m2');
+select t.ok((select count(*) from merchant_checkins() where id = :'rsv') = 0, 'La précommande n''apparaît pas encore sur la tablette');
+select t.login('bbbbbbbb-0000-0000-0000-000000000044');
+select t.throws(format($$select client_arrive(%L, %s, %s)$$, :'rsv', :'m2lat'::float + 0.01, :'m2lng'), 'TOO_FAR', 'Loin du magasin : la visite ne s''active pas');
+select t.ok((client_arrive(:'rsv', :'m2lat'::float + 0.0005, :'m2lng'::float, 20)->>'status') = 'waiting', 'Arrivé à moins de 150 m : la visite s''active toute seule');
+reset role;
+select t.ok(exists (select 1 from notifications where key = 'client_present'), 'Le commerçant est prévenu à l''arrivée');
+set role authenticated;
+select t.login(:'m2');
+select t.ok((select count(*) from merchant_checkins() where id = :'rsv') = 1, 'Le client apparaît sur la tablette sans avoir scanné');
+select t.login('bbbbbbbb-0000-0000-0000-000000000044');
+select client_cancel_checkin(:'rsv');
+select client_reserve(:'m2shop')->>'checkin_id' as rsv2 \gset
+select t.ok((client_checkin(:'m2code')->>'checkin_id') = :'rsv2', 'Le QR code du comptoir active aussi la précommande');
+select client_cancel_checkin(:'rsv2');
+select client_reserve(:'m2shop')->>'checkin_id' as rsv3 \gset
+reset role;
+update checkins set expires_at = now() - interval '1 minute' where id = :'rsv3';
+select deals_expire_reservations();
+select t.ok((select status from checkins where id = :'rsv3') = 'cancelled' and (select client_answer from checkins where id = :'rsv3') is null,
+            'Précommande oubliée : annulée sans compter comme visite sans achat');
+set role authenticated;
+
 -- ---------- Bilan ----------
 reset role;
 \o
