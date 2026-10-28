@@ -824,7 +824,7 @@ select t.login(null);
 insert into auth.users (id, email, email_confirmed_at) values ('00000000-0000-4000-8000-0000000e55a1', 'boutique-essai@soukideals.com', null);
 insert into shops (owner_id, name, kind, zone_id, address, lat, lng, discount_pct, status)
 values ('00000000-0000-4000-8000-0000000e55a1', 'Boutique d''essai', 'boucherie', t.z('Paris (75)'), '1 rue de l''Essai, Paris', 48.89, 2.35, 10, 'suspended');
-update shops set status = 'suspended' where owner_id = '00000000-0000-4000-8000-0000000e55a1';
+update shops set status = 'active' where owner_id = '00000000-0000-4000-8000-0000000e55a1';
 select shop_code as essai_code, id as essai_id from shops where owner_id = '00000000-0000-4000-8000-0000000e55a1' \gset
 set role authenticated;
 select t.login(:'c1');
@@ -833,6 +833,10 @@ select t.throws(format($$select client_checkin(%L)$$, :'essai_code'), 'SHOP_UNAV
 select t.login(:'admin');
 select t.ok(shop_is_visible(:'essai_id'), 'Le fondateur voit la boutique d''essai');
 select t.ok((client_checkin(:'essai_code')->>'status') = 'waiting', 'Le fondateur peut y faire une visite d''essai');
+select t.login('00000000-0000-4000-8000-0000000e55a1');
+select t.ok((select count(*) from merchant_checkins()) = 1, 'La boutique d''essai voit la visite du fondateur');
+select t.login(:'c1');
+select t.ok((select count(*) from active_promos(null, null, null) p where p.shop_id = :'essai_id') = 0, 'Boutique d''essai active mais absente des offres des clients');
 
 -- ---------- Bilan ----------
 reset role;

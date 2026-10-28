@@ -139,3 +139,21 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
   echo
   echo "commit;"
 } > "$HERE/MISE_A_JOUR_020_VISITE_ESSAI.sql"
+
+{
+  echo "begin;"
+  echo "-- SOUKI DEALS : mise a jour 021 (compte de la boutique d'essai)."
+  echo "-- AVANT DE LANCER : remplacez ChoisissezUnMotDePasse (plus bas) par le mot de passe de votre choix."
+  cat "$HERE/migrations/021_boutique_essai_active.sql"
+  echo
+  cat "$HERE/extras/021_compte_boutique_essai.sql"
+  echo
+  echo "commit;"
+} > "$HERE/MISE_A_JOUR_021_COMPTE_ESSAI.sql"
+
+{
+  echo "begin;"
+  cat "$HERE/migrations/021_boutique_essai_active.sql"
+  echo
+  echo "commit;"
+} > "$HERE/MISE_A_JOUR_021_BOUTIQUE_ACTIVE.sql"
