@@ -2,6 +2,8 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Linking, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '../../src/components/Icon';
 import { euros, finalCents, Kind, kindLabel, openDirections, Product, unitLabel } from '../../src/lib/deals';
 import { t } from '../../src/lib/i18n';
 import { photoUrl } from '../../src/lib/photos';
@@ -25,6 +27,7 @@ type Shop = {
 
 export default function Commerce() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const insets = useSafeAreaInsets();
   const [shop, setShop] = useState<Shop | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [promos, setPromos] = useState<Promo[]>([]);
@@ -112,87 +115,130 @@ export default function Commerce() {
   }
 
   const best = Math.max(shop.discount_pct, ...products.map((p) => p.discount_pct ?? 0));
+  const cover = products.find((p) => p.photo_path)?.photo_path ?? null;
 
   return (
-    <ScrollView style={{ backgroundColor: colors.background }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
-      <Stack.Screen options={{ title: shop.name }} />
-      <View style={[styles.card, { backgroundColor: colors.prune, borderColor: colors.prune }]}>
-        <Text style={{ fontSize: 22, fontWeight: '900', color: '#fff' }}>{shop.name}</Text>
-        <Text style={{ color: colors.pruneSoft }}>{kindLabel(shop.kind)}</Text>
-        <Text style={{ color: '#fff', marginTop: 6 }}>{shop.address}</Text>
-        {shop.hours ? <Text style={{ color: colors.pruneSoft, marginTop: 2 }}>{shop.hours}</Text> : null}
-        {shop.halal_cert ? (
-          <Text style={{ color: colors.saffron, fontWeight: '700', marginTop: 6 }}>{t('Certification déclarée : {c}', { c: shop.halal_cert })}</Text>
-        ) : null}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
-          <DiscountTag pct={shop.discount_pct} big />
-          <Text style={{ color: '#fff', marginLeft: 10, flex: 1 }}>
-            {best > shop.discount_pct ? t('sur tout le magasin, jusqu’à -{n} % sur certains produits', { n: best }) : t('sur tout le magasin')}
-          </Text>
-        </View>
-      </View>
-
-      {promos.map((p) => (
-        <View key={p.id} style={[styles.card, { borderColor: colors.saffron, borderWidth: 2 }]}>
-          <Text style={{ fontSize: 13, fontWeight: '800', color: p.kind === 'flash' ? colors.saffronDark : colors.prune }}>
-            {`${p.kind === 'flash' ? t('OFFRE FLASH') : t('CADEAU')} · ${promoUntil(p)}`}
-          </Text>
-          <Text style={{ fontSize: 17, fontWeight: '900', color: colors.text, marginTop: 2 }}>{promoLabel(p)}</Text>
-          <Button
-            title={chosenId === p.id ? t('Offre choisie ✓ : je suis dans le magasin') : t('Choisir cette offre')}
-            variant={chosenId === p.id ? 'primary' : 'secondary'}
-            onPress={() => choose(p)}
-          />
-        </View>
-      ))}
-      <Button title={t('Je suis dans le magasin : scanner son QR code')} variant="accent" onPress={() => router.push('/entree')} />
-      <Button title={t('Obtenir mon bon de réduction')} variant="secondary" onPress={getVoucher} loading={busy} />
-      <Muted>{t('Montrez le QR code en caisse : la remise est appliquée sur votre ticket.')}</Muted>
-      <ErrorText>{error}</ErrorText>
-      <InfoText>{info}</InfoText>
-
-      <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
-        <View style={{ flex: 1 }}>
-          <Button title={t('Itinéraire')} variant="secondary" onPress={() => openDirections(shop.lat, shop.lng)} />
-        </View>
-        {shop.phone ? (
-          <View style={{ flex: 1 }}>
-            <Button title={t('Appeler')} variant="secondary" onPress={() => Linking.openURL(`tel:${shop.phone}`)} />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <Stack.Screen options={{ headerShown: false, title: shop.name }} />
+      <ScrollView contentContainerStyle={{ paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
+        <View style={{ height: 230 + insets.top, backgroundColor: colors.prune }}>
+          {cover ? (
+            <Image source={{ uri: photoUrl(cover) as string }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} resizeMode="cover" accessibilityLabel={shop.name} />
+          ) : (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: insets.top }}>
+              <Text style={{ fontSize: 90, fontWeight: '900', color: 'rgba(255,255,255,0.25)' }}>{shop.name.slice(0, 1).toUpperCase()}</Text>
+            </View>
+          )}
+          <Pressable
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/accueil'))}
+            accessibilityRole="button"
+            accessibilityLabel={t('Retour')}
+            style={{ position: 'absolute', left: 16, top: insets.top + 10, width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Icon name="back" color={colors.text} />
+          </Pressable>
+          <View style={{ position: 'absolute', right: 16, bottom: -20, backgroundColor: '#E8590C', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 10, elevation: 4 }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 24, fontWeight: '900' }}>{`-${Number(shop.discount_pct).toLocaleString('fr-FR')} %`}</Text>
           </View>
-        ) : null}
-      </View>
+        </View>
 
-      {shop.description ? (
-        <>
-          <SectionTitle>{t('À propos')}</SectionTitle>
-          <Muted>{shop.description}</Muted>
-        </>
-      ) : null}
-
-      <SectionTitle>{t('Produits et prix')}</SectionTitle>
-      {products.length === 0 ? <Muted>{t('Le commerçant n’a pas encore mis ses prix. La remise s’applique quand même en caisse.')}</Muted> : null}
-      {products.map((p) => {
-        const pct = p.discount_pct ?? shop.discount_pct;
-        return (
-          <View key={p.id} style={[styles.card, { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12 }, !p.in_stock && { opacity: 0.6 }]}>
-            {p.photo_path ? (
-              <Pressable onPress={() => setZoom(p)} accessibilityRole="imagebutton" accessibilityLabel={p.name}>
-                <Image source={{ uri: photoUrl(p.photo_path) as string }} style={{ width: 72, height: 72, borderRadius: 10, marginRight: 10, backgroundColor: colors.border }} />
-              </Pressable>
+        <View style={{ padding: 20, gap: 14 }}>
+          <View style={{ gap: 6, paddingRight: 90 }}>
+            <Text style={{ fontSize: 24, fontWeight: '900', color: colors.text }}>{shop.name}</Text>
+            <Text style={{ color: colors.muted }}>{`${kindLabel(shop.kind)} · ${shop.address}`}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {shop.halal_cert ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.pruneSoft, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                <Icon name="shield" color={colors.prune} size={16} />
+                <Text style={{ color: colors.prune, fontWeight: '800', fontSize: 13 }}>{t('Certification déclarée : {c}', { c: shop.halal_cert })}</Text>
+              </View>
             ) : null}
-            <View style={{ flex: 1, paddingRight: 8 }}>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text }}>{p.name}</Text>
-              <Muted>{[p.category, unitLabel(p.unit)].filter(Boolean).join(' · ')}</Muted>
-              {!p.in_stock ? <Text style={{ color: colors.danger, fontSize: 13 }}>{t('Rupture de stock')}</Text> : null}
+            {shop.hours ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                <Icon name="time" color={colors.muted} size={16} />
+                <Text style={{ color: colors.text, fontSize: 13 }}>{shop.hours}</Text>
+              </View>
+            ) : null}
+          </View>
+
+          <View style={[styles.card, { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 0 }]}>
+            <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: colors.pruneSoft, alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="tag" color={colors.prune} />
             </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={{ fontSize: 17, fontWeight: '900', color: colors.prune }}>{euros(finalCents(p.price_cents, pct))}</Text>
-              <Text style={{ fontSize: 12, color: colors.muted, textDecorationLine: 'line-through' }}>{euros(p.price_cents)}</Text>
-              <DiscountTag pct={pct} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontWeight: '800', color: colors.text, fontSize: 15 }}>{t('Remise permanente -{n} %', { n: shop.discount_pct })}</Text>
+              <Text style={{ color: colors.muted, fontSize: 13 }}>
+                {best > shop.discount_pct ? t('sur tout le magasin, jusqu’à -{n} % sur certains produits', { n: best }) : t('sur tout le magasin')}
+              </Text>
             </View>
           </View>
-        );
-      })}
+
+          {promos.map((p) => (
+            <View key={p.id} style={{ backgroundColor: colors.saffronSoft, borderColor: colors.saffron, borderWidth: 1.5, borderRadius: 18, padding: 14, gap: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Icon name="flash" color={colors.saffronDark} size={16} />
+                <Text style={{ fontSize: 12, fontWeight: '800', letterSpacing: 0.5, color: colors.saffronDark, flex: 1 }}>
+                  {`${p.kind === 'flash' ? t('OFFRE FLASH') : t('CADEAU')} · ${promoUntil(p)}`}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 17, fontWeight: '900', color: colors.text }}>{promoLabel(p)}</Text>
+              <Pressable
+                onPress={() => choose(p)}
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  { height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: chosenId === p.id ? colors.prune : '#E8590C' },
+                  pressed && { opacity: 0.85 },
+                ]}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 15 }}>
+                  {chosenId === p.id ? t('Offre choisie ✓ : je suis dans le magasin') : t('Choisir cette offre')}
+                </Text>
+              </Pressable>
+            </View>
+          ))}
+
+          <ErrorText>{error}</ErrorText>
+          <InfoText>{info}</InfoText>
+
+          {shop.description ? (
+            <View>
+              <SectionTitle>{t('À propos')}</SectionTitle>
+              <Muted>{shop.description}</Muted>
+            </View>
+          ) : null}
+
+          <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>{t('Produits et prix')}</Text>
+          {products.length === 0 ? <Muted>{t('Le commerçant n’a pas encore mis ses prix. La remise s’applique quand même en caisse.')}</Muted> : null}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -5 }}>
+            {products.map((p) => {
+              const pct = p.discount_pct ?? shop.discount_pct;
+              return (
+                <View key={p.id} style={[{ width: '33.33%', padding: 5 }, !p.in_stock && { opacity: 0.55 }]}>
+                  <Pressable onPress={() => (p.photo_path ? setZoom(p) : undefined)} accessibilityRole={p.photo_path ? 'imagebutton' : undefined} accessibilityLabel={p.name}>
+                    {p.photo_path ? (
+                      <Image source={{ uri: photoUrl(p.photo_path) as string }} style={{ width: '100%', aspectRatio: 1, borderRadius: 14, backgroundColor: colors.border }} />
+                    ) : (
+                      <View style={{ width: '100%', aspectRatio: 1, borderRadius: 14, backgroundColor: colors.pruneSoft, alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 30, fontWeight: '900', color: colors.prune }}>{p.name.slice(0, 1).toUpperCase()}</Text>
+                      </View>
+                    )}
+                    <View style={{ position: 'absolute', top: 6, right: 6 }}>
+                      <DiscountTag pct={pct} />
+                    </View>
+                  </Pressable>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginTop: 6 }} numberOfLines={2}>{p.name}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '900', color: colors.prune }}>{`${euros(finalCents(p.price_cents, pct))}${p.unit === 'kg' ? ' /kg' : ''}`}</Text>
+                  <Text style={{ fontSize: 11, color: colors.muted, textDecorationLine: 'line-through' }}>{euros(p.price_cents)}</Text>
+                  {!p.in_stock ? <Text style={{ color: colors.danger, fontSize: 11 }}>{t('Rupture de stock')}</Text> : null}
+                </View>
+              );
+            })}
+          </View>
+
+          <Pressable onPress={getVoucher} disabled={busy} accessibilityRole="button" style={{ paddingVertical: 8 }}>
+            <Text style={{ color: colors.prune, fontWeight: '700', textAlign: 'center' }}>{busy ? t('Un instant…') : t('Obtenir mon bon de réduction')}</Text>
+          </Pressable>
 
       <Modal visible={!!zoom} transparent animationType="fade" onRequestClose={() => setZoom(null)}>
         <Pressable onPress={() => setZoom(null)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
@@ -242,6 +288,37 @@ export default function Commerce() {
           <Text style={{ color: colors.muted, textDecorationLine: 'underline', textAlign: 'center' }}>{t('Signaler un problème')}</Text>
         </Pressable>
       )}
-    </ScrollView>
+        </View>
+      </ScrollView>
+
+      <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: Math.max(insets.bottom, 12), backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.border }}>
+        <Pressable
+          onPress={() => openDirections(shop.lat, shop.lng)}
+          accessibilityRole="button"
+          accessibilityLabel={t('Itinéraire')}
+          style={{ width: 56, height: 56, borderRadius: 16, borderWidth: 1.5, borderColor: colors.prune, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Icon name="navigate" color={colors.prune} />
+        </Pressable>
+        {shop.phone ? (
+          <Pressable
+            onPress={() => Linking.openURL(`tel:${shop.phone}`)}
+            accessibilityRole="button"
+            accessibilityLabel={t('Appeler')}
+            style={{ width: 56, height: 56, borderRadius: 16, borderWidth: 1.5, borderColor: colors.prune, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Icon name="call" color={colors.prune} />
+          </Pressable>
+        ) : null}
+        <Pressable
+          onPress={() => router.push('/entree')}
+          accessibilityRole="button"
+          style={({ pressed }) => [{ flex: 1, height: 56, borderRadius: 16, backgroundColor: colors.prune, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 }, pressed && { opacity: 0.85 }]}
+        >
+          <Icon name="scan" color="#FFFFFF" />
+          <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 16 }}>{t('Je suis dans le magasin')}</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }

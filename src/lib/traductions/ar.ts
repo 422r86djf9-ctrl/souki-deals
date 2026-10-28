@@ -687,4 +687,6 @@ export const AR: Record<string, string> = {
   'Chercher une mise à jour': 'البحث عن تحديث',
   'Merguez, agneau, poulet, dattes…': 'مرقاز، لحم خروف، دجاج، تمر…',
   'Le halal, moins cher': 'الحلال بسعر أقل',
+  'Remise permanente -{n} %': 'تخفيض دائم -{n} %',
+  'Un instant…': 'لحظة…',
 };

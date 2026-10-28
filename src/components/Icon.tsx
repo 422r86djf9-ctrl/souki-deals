@@ -9,6 +9,14 @@ const NAMES = {
   search: 'search-outline',
   chat: 'chatbubble-ellipses-outline',
   scan: 'scan-outline',
+  back: 'chevron-back',
+  navigate: 'navigate-outline',
+  call: 'call-outline',
+  tag: 'pricetag-outline',
+  flash: 'flash-outline',
+  time: 'time-outline',
+  shield: 'shield-checkmark-outline',
+  flag: 'flag-outline',
 } as const;
 
 export type IconName = keyof typeof NAMES;
