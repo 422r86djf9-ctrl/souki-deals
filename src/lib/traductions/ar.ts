@@ -679,4 +679,10 @@ export const AR: Record<string, string> = {
   'Accueil': 'الرئيسية',
   'Mes bons': 'قسائمي',
   'Profil': 'الملف الشخصي',
+  'Recherche d’une mise à jour…': 'جارٍ البحث عن تحديث…',
+  'Mises à jour à distance désactivées dans cette installation.': 'التحديثات عن بعد معطّلة في هذا التثبيت.',
+  'Vous avez déjà la dernière version.': 'لديك أحدث إصدار.',
+  'Téléchargement de la mise à jour…': 'جارٍ تنزيل التحديث…',
+  'Erreur': 'خطأ',
+  'Chercher une mise à jour': 'البحث عن تحديث',
 };

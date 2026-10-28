@@ -679,4 +679,10 @@ export const EN: Record<string, string> = {
   'Accueil': 'Home',
   'Mes bons': 'My vouchers',
   'Profil': 'Profile',
+  'Recherche d’une mise à jour…': 'Looking for an update…',
+  'Mises à jour à distance désactivées dans cette installation.': 'Remote updates are disabled in this install.',
+  'Vous avez déjà la dernière version.': 'You already have the latest version.',
+  'Téléchargement de la mise à jour…': 'Downloading the update…',
+  'Erreur': 'Error',
+  'Chercher une mise à jour': 'Check for an update',
 };
