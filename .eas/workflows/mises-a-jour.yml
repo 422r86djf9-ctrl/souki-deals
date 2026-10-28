@@ -1,8 +1,8 @@
 # Mise à jour à distance (sans build) à chaque envoi sur main.
 # Elle n'arrive que sur les applis installées avec la même version (runtimeVersion = version de app.json) :
 # changer la version dans app.json UNIQUEMENT quand un module natif change, puis refaire un build.
-# Publication sur les branches EAS « test » et « production » (créées automatiquement) ;
-# les canaux du même nom, créés au premier build, pointent vers elles.
+# Publication par canal (« test » et « production ») : la mise à jour part sur la branche reliée au canal.
+# Si le canal n'existe pas, il est créé et relié à une branche du même nom.
 name: Mises a jour a distance
 
 on:
@@ -14,10 +14,10 @@ jobs:
     name: Mise a jour (test)
     type: update
     params:
-      branch: test
+      channel: test
       platform: android
   update_production:
     name: Mise a jour (production)
     type: update
     params:
-      branch: production
+      channel: production
