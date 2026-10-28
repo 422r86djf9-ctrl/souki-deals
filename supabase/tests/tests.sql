@@ -818,6 +818,22 @@ select t.ok(support_unread() = 1, 'Pastille : réponse non lue');
 select t.ok(jsonb_array_length(support_my_thread()) = 2, 'Le particulier voit les deux messages');
 select t.ok(support_unread() = 0, 'Réponse lue : plus de pastille');
 
+-- ---------- Visite d'essai du fondateur (020) ----------
+reset role;
+select t.login(null);
+insert into auth.users (id, email, email_confirmed_at) values ('00000000-0000-4000-8000-0000000e55a1', 'boutique-essai@soukideals.com', null);
+insert into shops (owner_id, name, kind, zone_id, address, lat, lng, discount_pct, status)
+values ('00000000-0000-4000-8000-0000000e55a1', 'Boutique d''essai', 'boucherie', t.z('Paris (75)'), '1 rue de l''Essai, Paris', 48.89, 2.35, 10, 'suspended');
+update shops set status = 'suspended' where owner_id = '00000000-0000-4000-8000-0000000e55a1';
+select shop_code as essai_code, id as essai_id from shops where owner_id = '00000000-0000-4000-8000-0000000e55a1' \gset
+set role authenticated;
+select t.login(:'c1');
+select t.ok(not shop_is_visible(:'essai_id'), 'Boutique d''essai invisible des clients');
+select t.throws(format($$select client_checkin(%L)$$, :'essai_code'), 'SHOP_UNAVAILABLE', 'Un client ne peut pas y faire de visite');
+select t.login(:'admin');
+select t.ok(shop_is_visible(:'essai_id'), 'Le fondateur voit la boutique d''essai');
+select t.ok((client_checkin(:'essai_code')->>'status') = 'waiting', 'Le fondateur peut y faire une visite d''essai');
+
 -- ---------- Bilan ----------
 reset role;
 \o

@@ -696,4 +696,5 @@ export const EN: Record<string, string> = {
   'valable jusqu’à {h}': 'valid until {h}',
   'Le commerçant vous voit sur sa tablette': 'The shopkeeper sees you on their tablet',
   'de bienvenue déduits si vous payez {min} ou plus': 'welcome credit deducted if you pay {min} or more',
+  'Code magasin : {code}': 'Shop code: {code}',
 };

@@ -81,6 +81,7 @@ const COMPANY_FIELDS: { key: CKey; label: string; placeholder?: string }[] = [
 type ShopRow = {
   id: string;
   owner_id: string;
+  shop_code: string | null;
   name: string;
   kind: string;
   status: 'pending' | 'active' | 'suspended';
@@ -168,7 +169,7 @@ export default function Admin() {
         supabase.rpc('admin_summary'),
         supabase
           .from('shops')
-          .select('id, owner_id, name, kind, status, address, phone, siret, halal_cert, launch_offer, free_until, card_ok, discount_pct, created_at, zones(name)')
+          .select('id, owner_id, name, kind, status, shop_code, address, phone, siret, halal_cert, launch_offer, free_until, card_ok, discount_pct, created_at, zones(name)')
           .order('status')
           .order('created_at', { ascending: false }),
         supabase.from('purchases').select('id, amount_cents, dispute_reason, created_at, shops(name)').eq('status', 'disputed').order('created_at'),
@@ -440,6 +441,7 @@ export default function Admin() {
                 </View>
                 <Muted>{`${kindLabel(s.kind)} · ${s.zones?.name ?? ''} · -${s.discount_pct} %`}</Muted>
                 <Muted>{s.address}</Muted>
+                {s.shop_code ? <Muted>{t('Code magasin : {code}', { code: s.shop_code })}</Muted> : null}
                 <Muted>{[s.siret ? `SIRET ${s.siret}` : t('SIRET non renseigné'), s.halal_cert].filter(Boolean).join(' · ')}</Muted>
                 {o ? <Muted>{`${o.full_name ?? ''} ${o.phone ?? ''}`}</Muted> : null}
                 <Muted>

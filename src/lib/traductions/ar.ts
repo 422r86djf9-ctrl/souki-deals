@@ -696,4 +696,5 @@ export const AR: Record<string, string> = {
   'valable jusqu’à {h}': 'صالح حتى {h}',
   'Le commerçant vous voit sur sa tablette': 'التاجر يراك على جهازه',
   'de bienvenue déduits si vous payez {min} ou plus': 'ترحيب يُخصم إذا دفعت {min} أو أكثر',
+  'Code magasin : {code}': 'رمز المحل: {code}',
 };
