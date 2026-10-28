@@ -686,4 +686,5 @@ export const EN: Record<string, string> = {
   'Erreur': 'Error',
   'Chercher une mise à jour': 'Check for an update',
   'Merguez, agneau, poulet, dattes…': 'Merguez, lamb, chicken, dates…',
+  'Le halal, moins cher': 'Halal, for less',
 };

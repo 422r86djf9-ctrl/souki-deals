@@ -173,7 +173,7 @@ export default function Accueil() {
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <View style={{ flex: 1 }}>
                 <Text style={{ color: '#CDEBD7', fontSize: 13 }}>{t('Bonjour {name}', { name: firstName })}</Text>
-                <Text style={{ color: '#FFFFFF', fontSize: 22, fontWeight: '800' }}>{t('Le halal au meilleur prix')}</Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 22, fontWeight: '800' }}>{t('Le halal, moins cher')}</Text>
               </View>
               <Pressable
                 onPress={() => router.push('/messages')}
