@@ -728,4 +728,5 @@ export const AR: Record<string, string> = {
   'Autorisez la localisation puis réessayez.': 'اسمح بتحديد الموقع ثم أعد المحاولة.',
   'C’est fait': 'تم',
   'La boutique d’essai est maintenant à votre position.': 'المحل التجريبي الآن في موقعك.',
+  'Votre code (si le commerçant le demande)': 'رمزك (إذا طلبه التاجر)',
 };

@@ -248,7 +248,7 @@ export default function Entree() {
               <View style={{ width: 22, height: 44, borderTopLeftRadius: 22, borderBottomLeftRadius: 22, backgroundColor: colors.prune, marginRight: -1 }} />
             </View>
             <View style={{ alignItems: 'center', paddingHorizontal: 18, paddingTop: 12, paddingBottom: 20, gap: 8 }}>
-              <Text style={{ fontSize: 13, color: colors.muted }}>{t('Code à montrer en caisse')}</Text>
+              <Text style={{ fontSize: 13, color: colors.muted }}>{t('Votre code (si le commerçant le demande)')}</Text>
               <Text style={{ fontSize: 40, fontWeight: '900', color: colors.prune, letterSpacing: 4 }} numberOfLines={1} adjustsFontSizeToFit selectable>{visit.vouchers?.code ?? ''}</Text>
               <Text style={{ fontSize: 13, color: colors.muted }}>
                 {[firstName, t('valable jusqu’à {h}', { h: new Date(visit.expires_at).toTimeString().slice(0, 5).replace(':', ' h ') })].filter(Boolean).join(' · ')}

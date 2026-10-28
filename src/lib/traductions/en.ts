@@ -728,4 +728,5 @@ export const EN: Record<string, string> = {
   'Autorisez la localisation puis réessayez.': 'Allow location and try again.',
   'C’est fait': 'Done',
   'La boutique d’essai est maintenant à votre position.': 'The test shop is now at your location.',
+  'Votre code (si le commerçant le demande)': 'Your code (if the shopkeeper asks)',
 };
