@@ -2,11 +2,11 @@
 // Le commerçant saisit le montant payé (remise déduite), ou indique que le client n'a rien acheté.
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { Alert, Text, TextInput, Vibration, View } from 'react-native';
+import { Alert, Pressable, Text, TextInput, Vibration, View } from 'react-native';
 import { euros, parseEuros, timeLabel } from '../lib/deals';
 import { t } from '../lib/i18n';
 import { errorMessage, supabase } from '../lib/supabase';
-import { Button, colors, ErrorText, InfoText, Muted, SectionTitle, styles } from '../lib/theme';
+import { colors, ErrorText, InfoText, Muted, SectionTitle, styles } from '../lib/theme';
 import { WelcomeBanner } from './WelcomeBanner';
 
 type Visit = {
@@ -92,16 +92,19 @@ export function ClientsPresents({ active, discountPct, onPurchase }: { active: b
         <Muted>{t('Quand un client scanne le QR code du magasin, il apparaît ici. Saisissez alors le montant payé.')}</Muted>
       ) : null}
       {visits.map((v) => (
-        <View key={v.id} style={[styles.card, { borderColor: colors.saffron, borderWidth: 2 }]}>
+        <View key={v.id} style={{ backgroundColor: colors.saffron, borderRadius: 22, padding: 16, marginBottom: 12, gap: 10 }}>
+          <Text style={{ fontSize: 11, fontWeight: '900', letterSpacing: 1.5, color: colors.text }}>{t('CLIENT DANS LE MAGASIN')}</Text>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={{ fontSize: 22, fontWeight: '900', color: colors.text }}>{v.first_name}</Text>
-            <Text style={{ fontSize: 18, fontWeight: '800', color: colors.prune, letterSpacing: 2 }}>{v.code}</Text>
+            <Text style={{ fontSize: 28, fontWeight: '900', color: colors.text, flex: 1 }} numberOfLines={1}>{v.first_name}</Text>
+            <Text style={{ fontSize: 20, fontWeight: '900', color: colors.text, letterSpacing: 3 }}>{v.code}</Text>
           </View>
-          <Muted>{t('Arrivé à {time} · remise de {pct} % à appliquer', { time: timeLabel(v.created_at), pct: String(discountPct).replace('.', ',') })}</Muted>
+          <Text style={{ color: colors.text, fontSize: 13 }}>
+            {t('Arrivé à {time} · remise de {pct} % à appliquer', { time: timeLabel(v.created_at), pct: String(discountPct).replace('.', ',') })}
+          </Text>
           {v.promo_title ? (
-            <View style={{ backgroundColor: colors.saffronSoft, borderRadius: 12, padding: 10, marginTop: 8, borderWidth: 2, borderStyle: 'dashed', borderColor: colors.saffron }}>
-              <Text style={{ fontWeight: '800', color: colors.saffronDark, fontSize: 12 }}>{t('OFFRE CHOISIE PAR LE CLIENT')}</Text>
-              <Text style={{ fontWeight: '900', color: colors.text, fontSize: 18 }}>
+            <View style={{ backgroundColor: '#FFFFFF', borderRadius: 14, padding: 12 }}>
+              <Text style={{ fontWeight: '800', color: colors.saffronDark, fontSize: 11 }}>{t('OFFRE CHOISIE PAR LE CLIENT')}</Text>
+              <Text style={{ fontWeight: '900', color: colors.text, fontSize: 17, marginTop: 2 }}>
                 {v.promo_kind === 'gift'
                   ? t('{title} offert dès {min}', { title: v.promo_title, min: euros(v.promo_min_cents ?? 0) })
                   : t('{title} : -{pct} %', { title: v.promo_title, pct: String(v.promo_pct ?? 0).replace('.', ',') })}
@@ -109,24 +112,30 @@ export function ClientsPresents({ active, discountPct, onPurchase }: { active: b
             </View>
           ) : null}
           <WelcomeBanner cents={v.welcome_cents ?? 0} minCents={v.welcome_min_cents ?? 0} />
-          <Text style={{ fontWeight: '700', color: colors.text, marginTop: 10 }}>{t('Montant payé, remise déduite (€)')}</Text>
+          <Text style={{ fontWeight: '800', color: colors.text }}>{t('Montant payé, remise déduite (€)')}</Text>
           <TextInput
             value={amounts[v.id] ?? ''}
             onChangeText={(x) => setAmounts((a) => ({ ...a, [v.id]: x.replace(/[^0-9.,]/g, '') }))}
             keyboardType="decimal-pad"
             placeholder="0,00"
             placeholderTextColor={colors.muted}
-            style={[styles.input, { fontSize: 26, fontWeight: '800', textAlign: 'center' }]}
+            style={[styles.input, { fontSize: 28, fontWeight: '900', textAlign: 'center', backgroundColor: '#FFFFFF', marginBottom: 0 }]}
             maxLength={8}
           />
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <View style={{ flex: 2 }}>
-              <Button title={t('Valider l’achat')} onPress={() => complete(v)} loading={busy === v.id} disabled={!!busy} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Button title={t('Pas d’achat')} variant="secondary" onPress={() => dismiss(v)} disabled={!!busy} />
-            </View>
-          </View>
+          <Pressable
+            onPress={() => complete(v)}
+            disabled={!!busy}
+            accessibilityRole="button"
+            style={({ pressed }) => [
+              { height: 54, borderRadius: 14, backgroundColor: colors.text, alignItems: 'center', justifyContent: 'center' },
+              (pressed || !!busy) && { opacity: 0.8 },
+            ]}
+          >
+            <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 16 }}>{busy === v.id ? t('Un instant…') : t('Valider l’achat')}</Text>
+          </Pressable>
+          <Pressable onPress={() => dismiss(v)} disabled={!!busy} accessibilityRole="button" style={{ paddingVertical: 6 }}>
+            <Text style={{ color: colors.text, textAlign: 'center', fontWeight: '700', textDecorationLine: 'underline' }}>{t('Pas d’achat')}</Text>
+          </Pressable>
         </View>
       ))}
     </View>

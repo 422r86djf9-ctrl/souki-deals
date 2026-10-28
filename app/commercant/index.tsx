@@ -1,7 +1,9 @@
 // Espace commerçant : compte du jour et de la semaine, scanner, produits
 import { Stack, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, StatusBar, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon, IconName } from '../../src/components/Icon';
 import { ClientsPresents } from '../../src/components/ClientsPresents';
 import { TERMS_VERSION } from '../../src/lib/conditions';
 import { euros, fullDate, Invoice, invoiceEmailLabel, shortDate, timeLabel } from '../../src/lib/deals';
@@ -39,15 +41,36 @@ function chargeLabel(s: Charge['status']) {
 
 function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <View style={[styles.card, { width: '48%', paddingVertical: 12 }]}>
-      <Text style={{ fontSize: 20, fontWeight: '900', color: colors.prune }}>{value}</Text>
-      <Text style={{ color: colors.muted, fontSize: 13 }}>{label}</Text>
-      {sub ? <Text style={{ color: colors.muted, fontSize: 12 }}>{sub}</Text> : null}
+    <View style={{ width: '48.5%', backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 16, padding: 14, marginBottom: 10 }}>
+      <Text style={{ color: colors.muted, fontSize: 12 }}>{label}</Text>
+      <Text style={{ fontSize: 22, fontWeight: '900', color: colors.text, marginTop: 2 }} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+      {sub ? <Text style={{ color: colors.prune, fontSize: 12, fontWeight: '700' }}>{sub}</Text> : null}
     </View>
   );
 }
 
+function Shortcut({ icon, label, onPress, disabled }: { icon: IconName; label: string; onPress: () => void; disabled?: boolean }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        { width: '31.5%', backgroundColor: colors.pruneSoft, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 6, alignItems: 'center', gap: 6, marginBottom: 8 },
+        disabled && { opacity: 0.45 },
+        pressed && { opacity: 0.8 },
+      ]}
+    >
+      <Icon name={icon} color={colors.prune} size={24} />
+      <Text style={{ color: colors.prune, fontWeight: '700', fontSize: 12, textAlign: 'center' }}>{label}</Text>
+    </Pressable>
+  );
+}
+
 export default function Commercant() {
+  const insets = useSafeAreaInsets();
+  const top = Math.max(insets.top, StatusBar.currentHeight ?? 0, 24);
+  const [shopName, setShopName] = useState('');
   const [stats, setStats] = useState<Stats | null>(null);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [charges, setCharges] = useState<Charge[]>([]);
@@ -75,7 +98,7 @@ export default function Commercant() {
         .eq('shop_id', shop)
         .order('seq', { ascending: false })
         .limit(24),
-      supabase.from('shops').select('terms_version').eq('id', shop).maybeSingle(),
+      supabase.from('shops').select('terms_version, name').eq('id', shop).maybeSingle(),
       supabase.from('shop_bank').select('iban').maybeSingle(),
     ]);
     if (s.error) setError(errorMessage(s.error));
@@ -84,6 +107,7 @@ export default function Commercant() {
     setCharges((c.data ?? []) as Charge[]);
     setInvoices((f.data ?? []) as Invoice[]);
     const v = (tv.data as { terms_version?: string | null } | null)?.terms_version;
+    setShopName((tv.data as { name?: string } | null)?.name ?? '');
     setTermsOutdated(!!v && v !== TERMS_VERSION);
     setBank((bk.data ?? null) as { iban: string } | null);
   }, []);
@@ -120,7 +144,7 @@ export default function Commercant() {
   return (
     <ScrollView
       style={{ backgroundColor: colors.background }}
-      contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+      contentContainerStyle={{ paddingBottom: 40 }}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -132,7 +156,48 @@ export default function Commercant() {
         />
       }
     >
-      <Stack.Screen options={{ title: t('Mon commerce') }} />
+      <Stack.Screen options={{ title: t('Mon commerce'), headerShown: false }} />
+      <View style={{ backgroundColor: colors.text, paddingTop: top + 8, paddingHorizontal: 16, paddingBottom: 18, gap: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Pressable
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/accueil'))}
+            accessibilityRole="button"
+            accessibilityLabel={t('Retour')}
+            style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Icon name="back" color="#FFFFFF" />
+          </Pressable>
+          <Text style={{ color: '#CDEBD7', fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>{t('ESPACE COMMERÇANT')}</Text>
+        </View>
+        <Text style={{ color: '#FFFFFF', fontSize: 24, fontWeight: '900', marginTop: 6 }}>{shopName}</Text>
+        {stats ? (
+          <View
+            style={{
+              alignSelf: 'flex-start',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              marginTop: 4,
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              borderRadius: 999,
+              backgroundColor: stats.status === 'active' && !stats.blocked ? colors.prune : stats.status === 'pending' ? colors.saffronDark : colors.danger,
+            }}
+          >
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#FFFFFF' }} />
+            <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
+              {stats.status === 'pending'
+                ? t('En cours de validation')
+                : stats.status === 'suspended'
+                  ? t('Suspendu')
+                  : stats.blocked
+                    ? t('Masqué aux clients')
+                    : t('En ligne · visible des clients')}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+      <View style={{ padding: 16 }}>
       <ErrorText>{error}</ErrorText>
       <InfoText>{info}</InfoText>
       {stats ? (
@@ -168,13 +233,13 @@ export default function Commercant() {
           ) : null}
 
           <ClientsPresents active={stats.status === 'active'} discountPct={Number(stats.discount_pct)} onPurchase={load} />
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <View style={{ flex: 1 }}>
-              <Button title={t('QR code du magasin')} variant="accent" onPress={() => router.push('/commercant/qr')} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Button title={t('Scanner un bon client')} variant="secondary" onPress={() => router.push('/commercant/scanner')} disabled={stats.status !== 'active'} />
-            </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginTop: 8 }}>
+            <Shortcut icon="qr" label={t('QR code du magasin')} onPress={() => router.push('/commercant/qr')} />
+            <Shortcut icon="flash" label={t('Mes promos')} onPress={() => router.push('/commercant/promos')} />
+            <Shortcut icon="bag" label={t('Mes produits')} onPress={() => router.push('/commercant/produits')} />
+            <Shortcut icon="scan" label={t('Scanner un bon client')} onPress={() => router.push('/commercant/scanner')} disabled={stats.status !== 'active'} />
+            <Shortcut icon="store" label={t('Mes informations')} onPress={() => router.push('/commercant/inscription')} />
+            <Shortcut icon="doc" label={t('Relevé annuel')} onPress={() => router.push('/commercant/releve')} />
           </View>
 
           <SectionTitle>{t('Ce que Souki Deals vous a amené')}</SectionTitle>
@@ -213,17 +278,6 @@ export default function Commercant() {
             </Pressable>
           </View>
 
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            <View style={{ flexGrow: 1, flexBasis: '45%' }}>
-              <Button title={t('Mes produits')} variant="secondary" onPress={() => router.push('/commercant/produits')} />
-            </View>
-            <View style={{ flexGrow: 1, flexBasis: '45%' }}>
-              <Button title={t('Mes promos')} variant="secondary" onPress={() => router.push('/commercant/promos')} />
-            </View>
-            <View style={{ flexGrow: 1, flexBasis: '45%' }}>
-              <Button title={t('Mes informations')} variant="secondary" onPress={() => router.push('/commercant/inscription')} />
-            </View>
-          </View>
 
           <SectionTitle>{t('Derniers achats')}</SectionTitle>
           {purchases.length === 0 ? <Muted>{t('Aucun achat scanné pour le moment.')}</Muted> : null}
@@ -283,6 +337,7 @@ export default function Commercant() {
           ))}
         </>
       ) : null}
+      </View>
     </ScrollView>
   );
 }

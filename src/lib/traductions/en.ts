@@ -697,4 +697,9 @@ export const EN: Record<string, string> = {
   'Le commerçant vous voit sur sa tablette': 'The shopkeeper sees you on their tablet',
   'de bienvenue déduits si vous payez {min} ou plus': 'welcome credit deducted if you pay {min} or more',
   'Code magasin : {code}': 'Shop code: {code}',
+  'ESPACE COMMERÇANT': 'SHOP AREA',
+  'En cours de validation': 'Being reviewed',
+  'Masqué aux clients': 'Hidden from customers',
+  'En ligne · visible des clients': 'Online · visible to customers',
+  'CLIENT DANS LE MAGASIN': 'CUSTOMER IN THE SHOP',
 };

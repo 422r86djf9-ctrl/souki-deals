@@ -17,6 +17,10 @@ const NAMES = {
   time: 'time-outline',
   shield: 'shield-checkmark-outline',
   flag: 'flag-outline',
+  qr: 'qr-code-outline',
+  bag: 'bag-handle-outline',
+  store: 'storefront-outline',
+  doc: 'document-text-outline',
 } as const;
 
 export type IconName = keyof typeof NAMES;

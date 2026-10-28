@@ -697,4 +697,9 @@ export const AR: Record<string, string> = {
   'Le commerçant vous voit sur sa tablette': 'التاجر يراك على جهازه',
   'de bienvenue déduits si vous payez {min} ou plus': 'ترحيب يُخصم إذا دفعت {min} أو أكثر',
   'Code magasin : {code}': 'رمز المحل: {code}',
+  'ESPACE COMMERÇANT': 'فضاء التاجر',
+  'En cours de validation': 'قيد المراجعة',
+  'Masqué aux clients': 'مخفي عن الزبائن',
+  'En ligne · visible des clients': 'متصل · ظاهر للزبائن',
+  'CLIENT DANS LE MAGASIN': 'زبون في المحل',
 };
