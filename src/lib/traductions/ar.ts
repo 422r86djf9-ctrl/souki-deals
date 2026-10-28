@@ -691,7 +691,7 @@ export const AR: Record<string, string> = {
   'Un instant…': 'لحظة…',
   'Voir la fiche du commerce': 'عرض صفحة المحل',
   'Cadeau': 'هدية',
-  '+ -{n} % sur le reste des achats': '+ -{n} % على باقي المشتريات',
+  'Et -{n} % sur le reste des achats': 'و -{n} % على باقي المشتريات',
   'Code à montrer en caisse': 'الرمز الذي تُظهره عند الدفع',
   'valable jusqu’à {h}': 'صالح حتى {h}',
   'Le commerçant vous voit sur sa tablette': 'التاجر يراك على جهازه',

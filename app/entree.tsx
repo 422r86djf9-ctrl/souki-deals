@@ -177,7 +177,7 @@ export default function Entree() {
               </Text>
               {visit.promos ? (
                 <Text style={{ fontSize: 13, color: colors.muted, textAlign: 'center' }}>
-                  {t('+ -{n} % sur le reste des achats', { n: Number(visit.shops?.discount_pct ?? 5).toLocaleString('fr-FR') })}
+                  {t('Et -{n} % sur le reste des achats', { n: Number(visit.shops?.discount_pct ?? 5).toLocaleString('fr-FR') })}
                 </Text>
               ) : null}
             </View>
@@ -188,7 +188,7 @@ export default function Entree() {
             </View>
             <View style={{ alignItems: 'center', paddingHorizontal: 18, paddingTop: 12, paddingBottom: 20, gap: 8 }}>
               <Text style={{ fontSize: 13, color: colors.muted }}>{t('Code à montrer en caisse')}</Text>
-              <Text style={{ fontSize: 44, fontWeight: '900', color: colors.prune, letterSpacing: 8 }} selectable>{visit.vouchers?.code ?? ''}</Text>
+              <Text style={{ fontSize: 40, fontWeight: '900', color: colors.prune, letterSpacing: 4 }} numberOfLines={1} adjustsFontSizeToFit selectable>{visit.vouchers?.code ?? ''}</Text>
               <Text style={{ fontSize: 13, color: colors.muted }}>
                 {[firstName, t('valable jusqu’à {h}', { h: new Date(visit.expires_at).toTimeString().slice(0, 5).replace(':', ' h ') })].filter(Boolean).join(' · ')}
               </Text>

@@ -691,7 +691,7 @@ export const EN: Record<string, string> = {
   'Un instant…': 'One moment…',
   'Voir la fiche du commerce': 'View the shop page',
   'Cadeau': 'Gift',
-  '+ -{n} % sur le reste des achats': '+ -{n}% on the rest of your shopping',
+  'Et -{n} % sur le reste des achats': 'And -{n}% on the rest of your shopping',
   'Code à montrer en caisse': 'Code to show at the till',
   'valable jusqu’à {h}': 'valid until {h}',
   'Le commerçant vous voit sur sa tablette': 'The shopkeeper sees you on their tablet',
