@@ -2,7 +2,7 @@
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Linking, Pressable, RefreshControl, ScrollView, Switch, Text, View } from 'react-native';
-import { euros, fullDate, Invoice, invoiceEmailLabel, kindLabel, parseEuros, shortDate, Zone } from '../src/lib/deals';
+import { currentPosition, euros, fullDate, Invoice, invoiceEmailLabel, kindLabel, parseEuros, shortDate, Zone } from '../src/lib/deals';
 import { t, zoneLabel } from '../src/lib/i18n';
 import { photoUrl } from '../src/lib/photos';
 import { errorMessage, supabase, whoami } from '../src/lib/supabase';
@@ -259,6 +259,7 @@ export default function Admin() {
     setBusy(false);
     if (error) setError(errorMessage(error));
     await load();
+    return !error;
   }
 
   function confirm(title: string, body: string, action: () => void) {
@@ -459,6 +460,19 @@ export default function Admin() {
                   </Pressable>
                 ) : null}
                 <Button title={t('Voir la fiche du commerce')} variant="secondary" onPress={() => router.push({ pathname: '/commerce/[id]', params: { id: s.id } })} />
+                {s.owner_id === '00000000-0000-4000-8000-0000000e55a1' ? (
+                  <Button
+                    title={t('Placer la boutique d’essai à ma position')}
+                    variant="secondary"
+                    disabled={busy}
+                    onPress={async () => {
+                      const pos = await currentPosition();
+                      if (!pos) return Alert.alert(t('Position introuvable'), t('Autorisez la localisation puis réessayez.'));
+                      if (!(await rpc('admin_move_test_shop', { p_lat: pos.lat, p_lng: pos.lng }))) return;
+                      Alert.alert(t('C’est fait'), t('La boutique d’essai est maintenant à votre position.'));
+                    }}
+                  />
+                ) : null}
                 {s.status !== 'active' ? (
                   <Button title={t('Valider ce commerce')} disabled={busy} onPress={() => confirm(t('Valider ce commerce ?'), s.name, () => rpc('admin_set_shop_status', { p_shop_id: s.id, p_status: 'active' }))} />
                 ) : (

@@ -875,6 +875,15 @@ select t.ok((select status from checkins where id = :'rsv3') = 'cancelled' and (
             'Précommande oubliée : annulée sans compter comme visite sans achat');
 set role authenticated;
 
+-- ---------- Placer la boutique d'essai (023) ----------
+select t.login(:'c1');
+select t.throws($$select admin_move_test_shop(48.88, 2.46)$$, 'NOT_ADMIN', 'Seul le fondateur déplace la boutique d''essai');
+select t.login(:'admin');
+select admin_move_test_shop(48.8781, 2.4619);
+reset role;
+select t.ok((select lat from shops where owner_id = '00000000-0000-4000-8000-0000000e55a1') = 48.8781, 'Boutique d''essai placée à la position du fondateur');
+set role authenticated;
+
 -- ---------- Bilan ----------
 reset role;
 \o

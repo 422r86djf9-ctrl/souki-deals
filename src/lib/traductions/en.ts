@@ -723,4 +723,9 @@ export const EN: Record<string, string> = {
   'Précommande introuvable ou expirée.': 'Pre-order not found or expired.',
   'Position introuvable : autorisez la localisation ou scannez le QR code du comptoir.': 'Location not found: allow location or scan the QR code at the counter.',
   'Vous êtes encore à {n} m du commerce.': 'You are still {n} m from the shop.',
+  'Placer la boutique d’essai à ma position': 'Place the test shop at my location',
+  'Position introuvable': 'Location not found',
+  'Autorisez la localisation puis réessayez.': 'Allow location and try again.',
+  'C’est fait': 'Done',
+  'La boutique d’essai est maintenant à votre position.': 'The test shop is now at your location.',
 };

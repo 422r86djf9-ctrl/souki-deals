@@ -723,4 +723,9 @@ export const AR: Record<string, string> = {
   'Précommande introuvable ou expirée.': 'الطلب المسبق غير موجود أو منتهي.',
   'Position introuvable : autorisez la localisation ou scannez le QR code du comptoir.': 'تعذّر تحديد الموقع: اسمح بتحديد الموقع أو امسح رمز QR.',
   'Vous êtes encore à {n} m du commerce.': 'ما زلت على بُعد {n} م من المحل.',
+  'Placer la boutique d’essai à ma position': 'ضع المحل التجريبي في موقعي',
+  'Position introuvable': 'تعذّر تحديد الموقع',
+  'Autorisez la localisation puis réessayez.': 'اسمح بتحديد الموقع ثم أعد المحاولة.',
+  'C’est fait': 'تم',
+  'La boutique d’essai est maintenant à votre position.': 'المحل التجريبي الآن في موقعك.',
 };
