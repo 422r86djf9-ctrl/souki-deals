@@ -2,8 +2,7 @@
 // Sa visite s'affiche chez le commerçant, qui saisit le montant payé ; le client le confirme ici.
 import { Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, View } from 'react-native';
-import { BonOffre } from '../src/components/BonOffre';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { PurchaseAnswer } from '../src/components/PurchaseAnswer';
 import { Scanner } from '../src/components/Scanner';
 import { euros, shopCodeFromScan } from '../src/lib/deals';
@@ -35,11 +34,18 @@ export default function Entree() {
   const [typed, setTyped] = useState('');
   const [welcome, setWelcome] = useState<{ amount_cents: number; min_cents: number } | null>(null);
   const [shopPromos, setShopPromos] = useState<Promo[]>([]);
+  const [firstName, setFirstName] = useState('');
 
   const loadVisit = useCallback(async (id?: string) => {
     const { data: u } = await supabase.auth.getUser();
     const uid = u.user?.id;
     if (!uid) return;
+    supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', uid)
+      .maybeSingle()
+      .then(({ data: pf }) => setFirstName(((pf as { full_name: string | null } | null)?.full_name ?? '').split(' ')[0]));
     let q = supabase
       .from('checkins')
       .select('id, status, expires_at, purchase_id, shop_id, promos(id, shop_id, kind, title, discount_pct, min_cents, ends_at), shops(name, discount_pct), vouchers(code)')
@@ -153,41 +159,83 @@ export default function Entree() {
         </>
       ) : null}
 
-      {/* 2. En attente du montant */}
+      {/* 2. En attente du montant : le bon à montrer en caisse */}
       {visit?.status === 'waiting' ? (
-        <View style={[styles.card, { alignItems: 'center', paddingVertical: 22 }]}>
-          <Text style={{ fontSize: 15, color: colors.muted }}>{t('Vous êtes chez')}</Text>
-          <Text style={{ fontSize: 24, fontWeight: '900', color: colors.text, textAlign: 'center' }}>{visit.shops?.name ?? ''}</Text>
-          <View style={{ marginVertical: 10 }}>
-            <DiscountTag pct={visit.shops?.discount_pct ?? 5} big />
+        <View style={{ backgroundColor: colors.prune, borderRadius: 26, padding: 16, gap: 14 }}>
+          <View style={{ backgroundColor: '#FFFFFF', borderRadius: 22, overflow: 'hidden' }}>
+            <View style={{ alignItems: 'center', paddingHorizontal: 18, paddingTop: 20, paddingBottom: 14, gap: 4 }}>
+              <Text style={{ fontSize: 12, fontWeight: '800', letterSpacing: 2, color: colors.muted, textAlign: 'center' }}>{(visit.shops?.name ?? '').toUpperCase()}</Text>
+              <Text style={{ fontSize: 60, fontWeight: '900', color: '#E8590C', lineHeight: 66 }}>
+                {visit.promos
+                  ? visit.promos.discount_pct
+                    ? `-${Number(visit.promos.discount_pct).toLocaleString('fr-FR')} %`
+                    : t('Cadeau')
+                  : `-${Number(visit.shops?.discount_pct ?? 5).toLocaleString('fr-FR')} %`}
+              </Text>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text, textAlign: 'center' }}>
+                {visit.promos ? visit.promos.title : t('sur tout le magasin')}
+              </Text>
+              {visit.promos ? (
+                <Text style={{ fontSize: 13, color: colors.muted, textAlign: 'center' }}>
+                  {t('+ -{n} % sur le reste des achats', { n: Number(visit.shops?.discount_pct ?? 5).toLocaleString('fr-FR') })}
+                </Text>
+              ) : null}
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ width: 22, height: 44, borderTopRightRadius: 22, borderBottomRightRadius: 22, backgroundColor: colors.prune, marginLeft: -1 }} />
+              <View style={{ flex: 1, borderTopWidth: 3, borderStyle: 'dashed', borderColor: colors.border }} />
+              <View style={{ width: 22, height: 44, borderTopLeftRadius: 22, borderBottomLeftRadius: 22, backgroundColor: colors.prune, marginRight: -1 }} />
+            </View>
+            <View style={{ alignItems: 'center', paddingHorizontal: 18, paddingTop: 12, paddingBottom: 20, gap: 8 }}>
+              <Text style={{ fontSize: 13, color: colors.muted }}>{t('Code à montrer en caisse')}</Text>
+              <Text style={{ fontSize: 44, fontWeight: '900', color: colors.prune, letterSpacing: 8 }} selectable>{visit.vouchers?.code ?? ''}</Text>
+              <Text style={{ fontSize: 13, color: colors.muted }}>
+                {[firstName, t('valable jusqu’à {h}', { h: new Date(visit.expires_at).toTimeString().slice(0, 5).replace(':', ' h ') })].filter(Boolean).join(' · ')}
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.pruneSoft, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 }}>
+                <ActivityIndicator size="small" color={colors.prune} />
+                <Text style={{ color: colors.prune, fontWeight: '700', fontSize: 13, flexShrink: 1 }}>{t('Le commerçant vous voit sur sa tablette')}</Text>
+              </View>
+            </View>
           </View>
+
           {welcome && welcome.amount_cents > 0 ? (
-            <Text style={{ color: colors.success, fontWeight: '800', textAlign: 'center', marginBottom: 8 }}>
-              {t('+ {amount} offerts sur ce premier achat dès {min} : le commerçant les déduit.', { amount: euros(welcome.amount_cents), min: euros(welcome.min_cents) })}
-            </Text>
+            <View style={{ backgroundColor: colors.saffron, borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Text style={{ fontSize: 24, fontWeight: '900', color: colors.text }}>{euros(welcome.amount_cents)}</Text>
+              <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.text }}>
+                {t('de bienvenue déduits si vous payez {min} ou plus', { min: euros(welcome.min_cents) })}
+              </Text>
+            </View>
           ) : null}
-          {visit.promos ? (
-            <>
-              <BonOffre promo={visit.promos} shopName={visit.shops?.name ?? ''} />
-              <Button title={t('Retirer cette offre')} variant="secondary" onPress={() => usePromo(null)} />
-            </>
-          ) : shopPromos.length ? (
-            <View style={{ width: '100%', marginBottom: 8 }}>
-              <Text style={{ fontWeight: '800', color: colors.text, textAlign: 'center' }}>{t('Une offre en cours ici :')}</Text>
+
+          {!visit.promos && shopPromos.length ? (
+            <View style={{ gap: 8 }}>
+              <Text style={{ fontWeight: '800', color: '#FFFFFF', textAlign: 'center' }}>{t('Une offre en cours ici :')}</Text>
               {shopPromos.map((p) => (
-                <Button key={p.id} title={t('Utiliser : {offer}', { offer: promoLabel(p) })} variant="secondary" onPress={() => usePromo(p)} />
+                <Pressable
+                  key={p.id}
+                  onPress={() => usePromo(p)}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [{ minHeight: 50, borderRadius: 14, backgroundColor: '#E8590C', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 }, pressed && { opacity: 0.85 }]}
+                >
+                  <Text style={{ color: '#FFFFFF', fontWeight: '800', textAlign: 'center' }}>{t('Utiliser : {offer}', { offer: promoLabel(p) })}</Text>
+                </Pressable>
               ))}
             </View>
           ) : null}
-          <Text style={{ fontSize: 15, color: colors.muted }}>{t('Votre code')}</Text>
-          <Text style={{ fontSize: 36, fontWeight: '900', color: colors.prune, letterSpacing: 4 }}>{visit.vouchers?.code ?? ''}</Text>
-          <Text style={{ color: colors.text, textAlign: 'center', marginTop: 10 }}>
+
+          <Text style={{ color: '#E5F4EA', textAlign: 'center', fontSize: 13 }}>
             {t('Payez en caisse avec la remise. Le commerçant saisit le montant sur sa tablette : il s’affichera ici.')}
           </Text>
-          <ActivityIndicator style={{ marginTop: 14 }} color={colors.prune} />
-          <Muted>{t('En attente du commerçant…')}</Muted>
-          <View style={{ height: 8 }} />
-          <Button title={t('Je repars sans acheter')} variant="secondary" onPress={leave} />
+
+          {visit.promos ? (
+            <Pressable onPress={() => usePromo(null)} accessibilityRole="button" style={{ minHeight: 50, borderRadius: 14, borderWidth: 2, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>{t('Retirer cette offre')}</Text>
+            </Pressable>
+          ) : null}
+          <Pressable onPress={leave} accessibilityRole="button" style={{ paddingVertical: 10 }}>
+            <Text style={{ color: '#FFFFFF', textAlign: 'center', textDecorationLine: 'underline' }}>{t('Je repars sans acheter')}</Text>
+          </Pressable>
         </View>
       ) : null}
 

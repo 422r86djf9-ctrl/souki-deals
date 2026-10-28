@@ -690,4 +690,10 @@ export const AR: Record<string, string> = {
   'Remise permanente -{n} %': 'تخفيض دائم -{n} %',
   'Un instant…': 'لحظة…',
   'Voir la fiche du commerce': 'عرض صفحة المحل',
+  'Cadeau': 'هدية',
+  '+ -{n} % sur le reste des achats': '+ -{n} % على باقي المشتريات',
+  'Code à montrer en caisse': 'الرمز الذي تُظهره عند الدفع',
+  'valable jusqu’à {h}': 'صالح حتى {h}',
+  'Le commerçant vous voit sur sa tablette': 'التاجر يراك على جهازه',
+  'de bienvenue déduits si vous payez {min} ou plus': 'ترحيب يُخصم إذا دفعت {min} أو أكثر',
 };

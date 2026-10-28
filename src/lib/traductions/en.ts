@@ -690,4 +690,10 @@ export const EN: Record<string, string> = {
   'Remise permanente -{n} %': 'Permanent discount -{n}%',
   'Un instant…': 'One moment…',
   'Voir la fiche du commerce': 'View the shop page',
+  'Cadeau': 'Gift',
+  '+ -{n} % sur le reste des achats': '+ -{n}% on the rest of your shopping',
+  'Code à montrer en caisse': 'Code to show at the till',
+  'valable jusqu’à {h}': 'valid until {h}',
+  'Le commerçant vous voit sur sa tablette': 'The shopkeeper sees you on their tablet',
+  'de bienvenue déduits si vous payez {min} ou plus': 'welcome credit deducted if you pay {min} or more',
 };
