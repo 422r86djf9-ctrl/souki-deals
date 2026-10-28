@@ -689,4 +689,5 @@ export const AR: Record<string, string> = {
   'Le halal, moins cher': 'الحلال بسعر أقل',
   'Remise permanente -{n} %': 'تخفيض دائم -{n} %',
   'Un instant…': 'لحظة…',
+  'Voir la fiche du commerce': 'عرض صفحة المحل',
 };

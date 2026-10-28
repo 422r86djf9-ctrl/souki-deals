@@ -456,6 +456,7 @@ export default function Admin() {
                     <Text style={{ color: colors.prune, fontWeight: '700', marginTop: 4 }}>{t('Appeler {phone}', { phone: s.phone })}</Text>
                   </Pressable>
                 ) : null}
+                <Button title={t('Voir la fiche du commerce')} variant="secondary" onPress={() => router.push({ pathname: '/commerce/[id]', params: { id: s.id } })} />
                 {s.status !== 'active' ? (
                   <Button title={t('Valider ce commerce')} disabled={busy} onPress={() => confirm(t('Valider ce commerce ?'), s.name, () => rpc('admin_set_shop_status', { p_shop_id: s.id, p_status: 'active' }))} />
                 ) : (

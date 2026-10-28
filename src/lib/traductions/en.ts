@@ -689,4 +689,5 @@ export const EN: Record<string, string> = {
   'Le halal, moins cher': 'Halal, for less',
   'Remise permanente -{n} %': 'Permanent discount -{n}%',
   'Un instant…': 'One moment…',
+  'Voir la fiche du commerce': 'View the shop page',
 };
