@@ -1,5 +1,5 @@
 // Autour de moi : commerces halal proches, avec leur remise
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
 import { LiveMap, MapMarker } from '../src/components/LiveMap';
@@ -15,7 +15,8 @@ export default function Autour() {
   const [locating, setLocating] = useState(true);
   const [zones, setZones] = useState<Zone[]>([]);
   const [zone, setZone] = useState<number | null>(null);
-  const [kind, setKind] = useState<Kind | null>(null);
+  const params = useLocalSearchParams<{ kind?: string }>();
+  const [kind, setKind] = useState<Kind | null>(KINDS.includes(params.kind as Kind) ? (params.kind as Kind) : null);
   const [radius, setRadius] = useState(3);
   const [view, setView] = useState<'list' | 'map'>('list');
   const [shops, setShops] = useState<NearbyShop[]>([]);
