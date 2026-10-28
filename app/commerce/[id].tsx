@@ -1,7 +1,7 @@
 // Fiche d'un commerce : produits et prix remisés, bon de réduction, signalement
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Linking, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Linking, Modal, Pressable, ScrollView, StatusBar, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '../../src/components/Icon';
 import { euros, finalCents, Kind, kindLabel, openDirections, Product, unitLabel } from '../../src/lib/deals';
@@ -28,6 +28,7 @@ type Shop = {
 export default function Commerce() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
+  const top = Math.max(insets.top, StatusBar.currentHeight ?? 0, 24);
   const [shop, setShop] = useState<Shop | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [promos, setPromos] = useState<Promo[]>([]);
@@ -121,11 +122,11 @@ export default function Commerce() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Stack.Screen options={{ headerShown: false, title: shop.name }} />
       <ScrollView contentContainerStyle={{ paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
-        <View style={{ height: 230 + insets.top, backgroundColor: colors.prune }}>
+        <View style={{ height: 230 + top, backgroundColor: colors.prune }}>
           {cover ? (
             <Image source={{ uri: photoUrl(cover) as string }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} resizeMode="cover" accessibilityLabel={shop.name} />
           ) : (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: insets.top }}>
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: top }}>
               <Text style={{ fontSize: 90, fontWeight: '900', color: 'rgba(255,255,255,0.25)' }}>{shop.name.slice(0, 1).toUpperCase()}</Text>
             </View>
           )}
@@ -133,7 +134,7 @@ export default function Commerce() {
             onPress={() => (router.canGoBack() ? router.back() : router.replace('/accueil'))}
             accessibilityRole="button"
             accessibilityLabel={t('Retour')}
-            style={{ position: 'absolute', left: 16, top: insets.top + 10, width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}
+            style={{ position: 'absolute', left: 16, top: top + 10, width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFFFFF', elevation: 3, alignItems: 'center', justifyContent: 'center' }}
           >
             <Icon name="back" color={colors.text} />
           </Pressable>
@@ -291,12 +292,12 @@ export default function Commerce() {
         </View>
       </ScrollView>
 
-      <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: Math.max(insets.bottom, 12), backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.border }}>
+      <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: Math.max(insets.bottom, 12), backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.border }}>
         <Pressable
           onPress={() => openDirections(shop.lat, shop.lng)}
           accessibilityRole="button"
           accessibilityLabel={t('Itinéraire')}
-          style={{ width: 56, height: 56, borderRadius: 16, borderWidth: 1.5, borderColor: colors.prune, alignItems: 'center', justifyContent: 'center' }}
+          style={{ width: 52, height: 56, borderRadius: 16, borderWidth: 1.5, borderColor: colors.prune, alignItems: 'center', justifyContent: 'center' }}
         >
           <Icon name="navigate" color={colors.prune} />
         </Pressable>
@@ -305,7 +306,7 @@ export default function Commerce() {
             onPress={() => Linking.openURL(`tel:${shop.phone}`)}
             accessibilityRole="button"
             accessibilityLabel={t('Appeler')}
-            style={{ width: 56, height: 56, borderRadius: 16, borderWidth: 1.5, borderColor: colors.prune, alignItems: 'center', justifyContent: 'center' }}
+            style={{ width: 52, height: 56, borderRadius: 16, borderWidth: 1.5, borderColor: colors.prune, alignItems: 'center', justifyContent: 'center' }}
           >
             <Icon name="call" color={colors.prune} />
           </Pressable>
@@ -316,7 +317,7 @@ export default function Commerce() {
           style={({ pressed }) => [{ flex: 1, height: 56, borderRadius: 16, backgroundColor: colors.prune, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 }, pressed && { opacity: 0.85 }]}
         >
           <Icon name="scan" color="#FFFFFF" />
-          <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 16 }}>{t('Je suis dans le magasin')}</Text>
+          <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 15, flexShrink: 1 }} numberOfLines={1} adjustsFontSizeToFit>{t('Je suis dans le magasin')}</Text>
         </Pressable>
       </View>
     </View>
