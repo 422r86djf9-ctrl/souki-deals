@@ -36,6 +36,9 @@ export type Whoami = {
   is_admin: boolean;
   profile?: { full_name: string | null; phone: string | null; lang?: string | null } | null;
   shop?: { id: string; name: string; status: 'pending' | 'active' | 'suspended'; launch_offer: boolean; free_until: string | null; blocked: boolean } | null;
+  // Caissier d'un commerce (accès limité à la caisse) et invitations reçues
+  cashier?: { id: string; shop_id: string; shop_name: string; shop_status: 'pending' | 'active' | 'suspended'; discount_pct: number; display_name: string } | null;
+  cashier_invites?: { id: string; shop_name: string }[];
   pending_purchases?: number;
   visits_to_answer?: number;
 };

@@ -6,7 +6,7 @@ import { Scanner } from '../../src/components/Scanner';
 import { WelcomeBanner } from '../../src/components/WelcomeBanner';
 import { euros, parseEuros } from '../../src/lib/deals';
 import { t } from '../../src/lib/i18n';
-import { errorMessage, supabase } from '../../src/lib/supabase';
+import { errorMessage, supabase, whoami } from '../../src/lib/supabase';
 import { Button, colors, ErrorText, Field, Muted, styles } from '../../src/lib/theme';
 
 type Result = { purchase_id: string; amount_cents: number; commission_cents: number; free: boolean; welcome_cents?: number };
@@ -21,9 +21,22 @@ export default function ScannerScreen() {
   const [error, setError] = useState('');
   const [result, setResult] = useState<Result | null>(null);
   const [info, setInfo] = useState<Info | null>(null);
+  // Caissier : pas d'accès aux chiffres du commerce (remise lue dans whoami, commission masquée)
+  const [isCashier, setIsCashier] = useState(false);
 
   useEffect(() => {
-    supabase.rpc('merchant_stats').then(({ data }) => setDiscount((data as { discount_pct?: number } | null)?.discount_pct ?? null));
+    supabase.rpc('merchant_stats').then(async ({ data, error }) => {
+      if (!error) return setDiscount((data as { discount_pct?: number } | null)?.discount_pct ?? null);
+      try {
+        const me = await whoami();
+        if (me.cashier) {
+          setIsCashier(true);
+          setDiscount(Number(me.cashier.discount_pct));
+        }
+      } catch {
+        // la remise reste simplement non affichée
+      }
+    });
   }, []);
 
   async function takeCode(c: string) {
@@ -116,11 +129,13 @@ export default function ScannerScreen() {
                   {t('Bienvenue remboursée par Souki Deals : {amount}', { amount: euros(result.welcome_cents) })}
                 </Text>
               ) : null}
+              {isCashier ? null : (
               <Text style={{ fontSize: 16, color: colors.text }}>
                 {result.free
                   ? t('Commission : offerte (offre de lancement)')
                   : t('Commission Souki Deals : {amount}', { amount: euros(result.commission_cents) })}
               </Text>
+              )}
               <Muted>{t('Le client confirme le montant sur son téléphone.')}</Muted>
             </View>
             <Button title={t('Scanner un autre bon')} onPress={again} />

@@ -85,7 +85,9 @@ export default function Commercant() {
     setError('');
     const { data: shop } = await supabase.rpc('my_shop_id');
     if (!shop) {
-      router.replace('/commercant/inscription');
+      // Caissier (notification « client présent ») : il va à sa caisse, pas à l'inscription
+      const { data: counter } = await supabase.rpc('my_counter_shop_id');
+      router.replace(counter ? '/caisse' : '/commercant/inscription');
       return;
     }
     const [s, p, c, f, tv, bk] = await Promise.all([
@@ -239,6 +241,7 @@ export default function Commercant() {
             <Shortcut icon="bag" label={t('Mes produits')} onPress={() => router.push('/commercant/produits')} />
             <Shortcut icon="scan" label={t('Scanner un bon client')} onPress={() => router.push('/commercant/scanner')} disabled={stats.status !== 'active'} />
             <Shortcut icon="store" label={t('Mes informations')} onPress={() => router.push('/commercant/inscription')} />
+            <Shortcut icon="people" label={t('Mes caissiers')} onPress={() => router.push('/commercant/caissiers')} />
             <Shortcut icon="doc" label={t('Relevé annuel')} onPress={() => router.push('/commercant/releve')} />
           </View>
 

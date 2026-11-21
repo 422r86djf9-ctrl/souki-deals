@@ -884,6 +884,114 @@ reset role;
 select t.ok((select lat from shops where owner_id = '00000000-0000-4000-8000-0000000e55a1') = 48.8781, 'Boutique d''essai placée à la position du fondateur');
 set role authenticated;
 
+
+-- ---------- Caissiers (024) ----------
+reset role;
+insert into auth.users (id, email, email_confirmed_at) values
+  ('bbbbbbbb-0000-0000-0000-000000000061', 'caisse1@test.fr', now()),
+  ('bbbbbbbb-0000-0000-0000-000000000062', 'caisse2@test.fr', now()),
+  ('bbbbbbbb-0000-0000-0000-000000000063', 'caisse3@test.fr', null),
+  ('bbbbbbbb-0000-0000-0000-000000000064', 'clientcaisse@test.fr', now());
+insert into profiles (id, full_name) values ('bbbbbbbb-0000-0000-0000-000000000064', 'Karim D.') on conflict (id) do update set full_name = excluded.full_name;
+update shops set lat = 48.85, lng = 2.35 where id = :'m2shop';
+set role authenticated;
+\set k1 'bbbbbbbb-0000-0000-0000-000000000061'
+\set k2 'bbbbbbbb-0000-0000-0000-000000000062'
+\set k3 'bbbbbbbb-0000-0000-0000-000000000063'
+\set ck 'bbbbbbbb-0000-0000-0000-000000000064'
+select t.login(:'c1');
+select t.throws($$select merchant_add_cashier('caisse1@test.fr', 'Sofia')$$, 'NO_SHOP', 'Sans commerce : pas de caissier');
+select t.login(:'m2');
+select t.throws($$select merchant_add_cashier('pas-un-mail', 'Sofia')$$, 'BAD_EMAIL', 'E-mail du caissier vérifié');
+select t.throws($$select merchant_add_cashier('caisse1@test.fr', '  ')$$, 'BAD_NAME', 'Prénom du caissier obligatoire');
+select t.throws($$select merchant_add_cashier('resto@test.fr', 'Moi')$$, 'SELF', 'Le patron ne s''ajoute pas lui-même');
+select t.throws($$select merchant_add_cashier('Boucherie@Test.fr', 'Ali')$$, 'SHOP_OWNER', 'Un autre patron ne peut pas être caissier');
+select merchant_add_cashier(' Caisse1@Test.FR ', 'Sofia') as kid1 \gset
+select merchant_add_cashier('caisse2@test.fr', 'Malik') as kid2 \gset
+select merchant_add_cashier('caisse3@test.fr', 'Inès') as kid3 \gset
+select t.throws($$select merchant_add_cashier('caisse1@test.fr', 'Sofia')$$, 'ALREADY_CASHIER', 'Pas deux fois le même caissier');
+select t.ok((select count(*) from merchant_cashiers() where status = 'invited') = 3, 'Le patron voit ses 3 caissiers invités');
+select t.login(:'m1');
+select t.ok((select count(*) from shop_cashiers) = 0, 'Un autre commerce ne voit pas ces caissiers');
+select t.throws(format($$select merchant_remove_cashier(%L)$$, :'kid1'), 'NOT_FOUND', 'Un autre commerce ne retire pas un caissier');
+-- Avant d'accepter, le caissier n'a aucun accès
+select t.login(:'k1');
+select t.ok(jsonb_array_length(whoami()->'cashier_invites') = 1 and whoami()->'cashier' = 'null'::jsonb, 'Le caissier voit son invitation');
+select t.throws($$select * from merchant_checkins()$$, 'NO_SHOP', 'Invitation non acceptée : pas d''accès à la caisse');
+select t.login(:'k3');
+select t.throws(format($$select cashier_accept(%L)$$, :'kid3'), 'EMAIL_NOT_VERIFIED', 'E-mail non confirmé : invitation refusée');
+select t.login(:'k2');
+select t.throws(format($$select cashier_accept(%L)$$, :'kid1'), 'NOT_FOUND', 'On n''accepte pas l''invitation de quelqu''un d''autre');
+select cashier_accept(:'kid2');
+select t.login(:'k1');
+select t.ok((cashier_accept(:'kid1')->>'shop_id') = :'m2shop', 'Le caissier accepte et rejoint le commerce');
+select t.ok((whoami()->'cashier'->>'shop_id') = :'m2shop' and whoami()->'shop' = 'null'::jsonb, 'whoami : caissier du commerce, sans être patron');
+-- Accès limité : rien sur l'argent, les factures, l'IBAN, les réglages
+select t.throws($$select merchant_stats()$$, 'NO_SHOP', 'Le caissier ne voit pas les ventes et commissions');
+select t.ok((select count(*) from charges) = 0 and (select count(*) from invoices) = 0 and (select count(*) from shop_bank) = 0,
+            'Le caissier ne voit ni prélèvements, ni factures, ni IBAN');
+select t.throws($$select merchant_save_promo('flash', 'Poulet', 20, null, 3)$$, 'NO_SHOP', 'Le caissier ne crée pas de promo');
+select t.throws($$select merchant_add_cashier('x@test.fr', 'X')$$, 'NO_SHOP', 'Le caissier n''ajoute pas d''autres caissiers');
+update shops set discount_pct = 50 where id = :'m2shop';
+reset role;
+select t.ok((select discount_pct from shops where id = :'m2shop') <> 50, 'Le caissier ne change pas la remise du commerce');
+set role authenticated;
+select t.login(:'k1');
+select t.throws($$insert into shops (name, kind, address, zone_id, lat, lng, discount_pct) values ('Caisse X', 'boucherie', '12 rue de Paris', 1, 48.8, 2.3, 5)$$,
+                'IS_CASHIER', 'Un caissier n''inscrit pas son propre commerce sans quitter');
+-- Client présent : visible sur toutes les caisses, saisi une seule fois
+select t.login(:'ck');
+select (client_checkin(:'m2code')->>'checkin_id') as kck \gset
+reset role;
+select t.ok((select count(*) from notifications where key = 'client_present' and user_id in (:'k1', :'k2', :'m2')
+             and created_at > now() - interval '1 minute') >= 3, 'Le patron et chaque caissier sont prévenus');
+set role authenticated;
+select t.login(:'k2');
+select t.ok((select count(*) from merchant_checkins() where id = :'kck') = 1, 'Le client apparaît sur la caisse 2');
+select t.login(:'k1');
+select t.ok((select count(*) from merchant_checkins() where id = :'kck') = 1, 'Le client apparaît aussi sur la caisse 1');
+select merchant_complete_checkin(:'kck', 4200);
+select t.ok((select scanned_by from purchases where client_id = :'ck' order by created_at desc limit 1) = :'k1', 'L''achat garde le caissier qui l''a saisi');
+select t.ok((select count(*) from cashier_today()) = 1 and (select amount_cents from cashier_today() limit 1) = 4200, 'Le caissier voit sa caisse du jour');
+select t.login(:'k2');
+select t.ok((select count(*) from merchant_checkins() where id = :'kck') = 0, 'Pris par la caisse 1 : il disparaît de la caisse 2');
+select t.throws(format($$select merchant_complete_checkin(%L, 4200)$$, :'kck'), 'ALREADY_DONE', 'La caisse 2 ne peut pas le compter une deuxième fois');
+select t.ok((select count(*) from purchases) = 0, 'Le caissier 2 ne voit pas les achats saisis par le caissier 1');
+select t.login(:'m2');
+select t.ok((select today_count from merchant_cashiers() where id = :'kid1') = 1 and (select today_cents from merchant_cashiers() where id = :'kid1') = 4200,
+            'Le patron voit ce que chaque caissier a saisi');
+select t.login(:'admin');
+select t.ok(exists (select 1 from admin_shop_cashiers(:'m2shop') where name = 'Sofia' and count = 1), 'Le fondateur voit les achats par caissier');
+select t.login(:'k1');
+select t.throws($$select admin_shop_cashiers(gen_random_uuid())$$, 'NOT_ADMIN', 'Vue par caissier réservée au fondateur');
+-- Un caissier ne valide pas ses propres achats
+select t.login(:'k2');
+select (client_checkin(:'m2code')->>'checkin_id') as kself \gset
+select t.throws(format($$select merchant_complete_checkin(%L, 1000)$$, :'kself'), 'CASHIER_SELF', 'Un caissier ne valide pas son propre achat');
+select t.login(:'k1');
+select t.throws(format($$select merchant_complete_checkin(%L, 1000)$$, :'kself'), 'CASHIER_SELF', 'Ni celui d''un collègue caissier');
+select t.login(:'k2');
+select client_cancel_checkin(:'kself');
+-- Un seul commerce à la fois ; retrait immédiat
+select t.login(:'m1');
+select merchant_add_cashier('caisse1@test.fr', 'Sofia') as kid1b \gset
+select t.login(:'k1');
+select t.throws(format($$select cashier_accept(%L)$$, :'kid1b'), 'OTHER_SHOP', 'Caissier d''un seul commerce à la fois');
+select cashier_leave(:'kid1b');
+select t.login(:'m2');
+select merchant_remove_cashier(:'kid1');
+select t.login(:'k1');
+select t.throws($$select * from merchant_checkins()$$, 'NO_SHOP', 'Caissier retiré : il perd l''accès tout de suite');
+reset role;
+select t.ok((select scanned_by from purchases where client_id = :'ck' order by created_at desc limit 1) = :'k1', 'Ses achats passés restent comptés');
+set role authenticated;
+select t.login(:'k2');
+select cashier_leave(:'kid2');
+select t.ok(whoami()->'cashier' = 'null'::jsonb, 'Le caissier peut quitter le commerce');
+-- Le patron garde la main sur la caisse
+select t.login(:'m2');
+select t.ok((select count(*) from merchant_checkins()) >= 0, 'Le patron accède toujours à « Clients présents »');
+
 -- ---------- Bilan ----------
 reset role;
 \o

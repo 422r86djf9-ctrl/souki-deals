@@ -6,6 +6,7 @@ import { currentPosition, euros, fullDate, Invoice, invoiceEmailLabel, kindLabel
 import { t, zoneLabel } from '../src/lib/i18n';
 import { photoUrl } from '../src/lib/photos';
 import { errorMessage, supabase, whoami } from '../src/lib/supabase';
+import { AdminCashiers } from '../src/components/AdminCashiers';
 import { Button, Chip, colors, ErrorText, Field, InfoText, Muted, SectionTitle, styles } from '../src/lib/theme';
 
 type Thread = {
@@ -459,6 +460,7 @@ export default function Admin() {
                     <Text style={{ color: colors.prune, fontWeight: '700', marginTop: 4 }}>{t('Appeler {phone}', { phone: s.phone })}</Text>
                   </Pressable>
                 ) : null}
+                <AdminCashiers shopId={s.id} />
                 <Button title={t('Voir la fiche du commerce')} variant="secondary" onPress={() => router.push({ pathname: '/commerce/[id]', params: { id: s.id } })} />
                 {s.owner_id === '00000000-0000-4000-8000-0000000e55a1' ? (
                   <Button

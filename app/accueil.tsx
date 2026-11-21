@@ -1,6 +1,6 @@
 import { Href, router, Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { euros } from '../src/lib/deals';
 import { registerForPush, unregisterPush, updateMyArea } from '../src/lib/push';
@@ -39,6 +39,38 @@ function Card({ title, subtitle, badge, href, strong }: { title: string; subtitl
       </View>
       <Text style={{ color: strong ? colors.pruneSoft : colors.muted, marginTop: 4, fontSize: 15 }}>{subtitle}</Text>
     </Pressable>
+  );
+}
+
+// Invitation à devenir caissier d'un commerce : accepter ou refuser
+function CashierInvites({ me, onDone }: { me: Whoami; onDone: () => void }) {
+  const invites = me.cashier_invites ?? [];
+  const [busy, setBusy] = useState('');
+  if (!invites.length || me.shop) return null;
+  async function answer(id: string, accept: boolean) {
+    setBusy(id);
+    const { error } = await supabase.rpc(accept ? 'cashier_accept' : 'cashier_leave', { p_id: id });
+    setBusy('');
+    if (error) return Alert.alert(t('Une erreur est survenue.'), errorMessage(error));
+    if (accept) {
+      await setEspace('commercant');
+      router.push('/caisse');
+    }
+    onDone();
+  }
+  return (
+    <>
+      {invites.map((i) => (
+        <View key={i.id} style={[styles.card, { backgroundColor: colors.saffron, borderColor: colors.saffron, marginHorizontal: 0 }]}>
+          <Text style={{ fontSize: 18, fontWeight: '900', color: colors.text }}>{t('{shop} vous invite comme caissier', { shop: i.shop_name })}</Text>
+          <Text style={{ color: colors.text, marginTop: 2 }}>
+            {t('Vous verrez les clients Souki Deals présents dans le magasin et saisirez le montant payé.')}
+          </Text>
+          <Button title={t('Accepter')} onPress={() => answer(i.id, true)} loading={busy === i.id} />
+          <Button title={t('Refuser')} variant="secondary" onPress={() => answer(i.id, false)} disabled={!!busy} />
+        </View>
+      ))}
+    </>
   );
 }
 
@@ -111,7 +143,7 @@ export default function Accueil() {
       if (!data.user_id) return router.replace('/connexion');
       if (!data.profile?.full_name) return router.replace('/profil');
       // Sans choix enregistré : commerçant s'il a déjà un commerce, sinon particulier
-      const e = (await getEspace()) ?? (data.shop ? 'commercant' : 'particulier');
+      const e = (await getEspace()) ?? (data.shop || data.cashier ? 'commercant' : 'particulier');
       setEspaceState(e);
       setMe(data);
       registerForPush();
@@ -242,6 +274,10 @@ export default function Accueil() {
             {visits > 0 ? (
               <Card title={t('Avez-vous acheté ?')} subtitle={t('Une visite sans montant saisi : dites-nous ce qui s’est passé.')} href="/achats" strong />
             ) : null}
+            <CashierInvites me={me} onDone={load} />
+            {me.cashier && !me.shop ? (
+              <Card title={t('Ma caisse : {shop}', { shop: me.cashier.shop_name })} subtitle={t('Clients présents, scanner un bon, mes achats du jour.')} badge={t('Caissier')} href="/caisse" strong />
+            ) : null}
 
             {welcome && welcome.amount_cents > 0 ? (
               <View style={{ backgroundColor: colors.saffron, borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
@@ -362,7 +398,16 @@ export default function Accueil() {
 
       {me ? (
         <>
-          {espace === 'commercant' ? (
+          <CashierInvites me={me} onDone={load} />
+          {espace === 'commercant' && !me.shop && me.cashier ? (
+            <Card
+              title={t('Ma caisse : {shop}', { shop: me.cashier.shop_name })}
+              subtitle={t('Clients présents, scanner un bon, mes achats du jour.')}
+              badge={t('Caissier')}
+              href="/caisse"
+              strong
+            />
+          ) : espace === 'commercant' ? (
             <Card
               title={me.shop ? me.shop.name : t('Inscrire mon commerce')}
               subtitle={me.shop ? t('Scanner un bon, mes produits, mon compte.') : t('Attirez de nouveaux clients : rien à payer si on ne vous en amène pas.')}
@@ -405,6 +450,9 @@ export default function Accueil() {
               <Card title={t('Mes bons et achats')} subtitle={t('Vos QR codes de réduction et vos économies.')} href="/achats" />
               {me.shop ? (
                 <Card title={me.shop.name} subtitle={t('Scanner un bon, mes produits, mon compte.')} badge={shopBadge(me.shop)} href="/commercant" />
+              ) : null}
+              {me.cashier && !me.shop ? (
+                <Card title={t('Ma caisse : {shop}', { shop: me.cashier.shop_name })} subtitle={t('Clients présents, scanner un bon, mes achats du jour.')} badge={t('Caissier')} href="/caisse" />
               ) : null}
             </>
           )}

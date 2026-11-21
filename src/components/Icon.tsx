@@ -21,6 +21,7 @@ const NAMES = {
   bag: 'bag-handle-outline',
   store: 'storefront-outline',
   doc: 'document-text-outline',
+  people: 'people-outline',
 } as const;
 
 export type IconName = keyof typeof NAMES;
